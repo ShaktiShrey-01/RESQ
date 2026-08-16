@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    /* Sharper, deeper intensity for light mode text */
+    --global-text: #121f23;
+    --global-bg: #f8fafc; 
+  }
+
+  .dark {
+    /* Brighter, sharper luminous intensity for dark mode text */
+    --global-text: #dce0eb;
+    --global-bg: #000000; 
+  }
+
+  body {
+    color: var(--global-text);
+    background-color: var(--global-bg);
+    /* Increased global text size and added crisp anti-aliasing */
+    font-size: 1.05rem; 
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition: color 0.5s ease, background-color 0.5s ease;
+  }
+}
+
+@keyframes logout-slide {
+  0%, 100% { transform: translateX(0); opacity: 1; }
+  50% { transform: translateX(6px); opacity: 0.4; }
+}
+
+@keyframes logout-pop {
+  0% { transform: scale(0.5); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}

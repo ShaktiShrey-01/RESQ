@@ -14,8 +14,9 @@ const userschema=mongoose.Schema({
         type: [Number],
       },
     },
+    
    
-})
+},{timestamps:true})
 
 userschema.index({ location: '2dsphere' });
 const User=mongoose.model("User",userschema);

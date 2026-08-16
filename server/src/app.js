@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import userroutes from "./routes/user.routes.js";
-
+import emergencyroutes from "./routes/emergency.routes.js";
 const app = express();
 
 app.use(cookieParser());
@@ -10,6 +10,7 @@ app.use(express.json());
 app.use(cors());
 
 app.use("/api/users", userroutes);
+app.use("/api/emergencies", emergencyroutes);
 
 app.get("/", (req, res) => {
   res.send("RESQ API Server is running!");

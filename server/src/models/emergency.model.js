@@ -65,22 +65,24 @@ const emergencySchema = new mongoose.Schema(
     status: {
       type: String,
       enum: [
-        'REPORTED',
         'SEARCHING',
         'HELPER_ASSIGNED',
         'ON_THE_WAY',
         'ARRIVED',
-        'RESOLVED',
         'CLOSED',
       ],
-      default: 'REPORTED',
+      default: 'SEARCHING',
     },
-
-    // Optional media attached to emergency (Cloudinary URL)
-    imageUrl: {
-      type: String,
+acceptedAt: {
+      type: Date,
       default: null,
     },
+
+    arrivedAt: {
+      type: Date,
+      default: null,
+    },
+    // Optional media attached to emergency (Cloudinary URL)
 
     resolvedAt: {
       type: Date,

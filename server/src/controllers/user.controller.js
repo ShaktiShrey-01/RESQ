@@ -1,22 +1,71 @@
 import User from "../models/user.model.js";
 import jwt from "jsonwebtoken";
 import redis from "../config/redis.js";
+import nodemailer from "nodemailer";
+import bcrypt from "bcryptjs";
+
+// Create a nodemailer transporter
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+export async function sendSignupOTP(req, res) {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ success: false, message: "Email is required" });
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(409).json({ success: false, message: "Email is already registered" });
+    }
+
+    // 1. Generate 6-digit random OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // 2. Store OTP in Redis with a 5-minute (300 seconds) expiration
+    if (redis.status === "ready") {
+      await redis.set(`signup_otp:${email}`, otp, "EX", 300);
+    } else {
+      throw new Error("Redis is not connected");
+    }
+
+    // 3. Send the Email
+    const mailOptions = {
+      from: `"RESQ Emergency" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "Verify your email for RESQ",
+      text: `Your RESQ signup verification code is ${otp}. It expires in 5 minutes.`,
+      html: `<h2>Your RESQ verification code is <strong>${otp}</strong>.</h2><p>It will expire in 5 minutes.</p>`,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.status(200).json({
+      success: true,
+      message: "OTP sent successfully to your email",
+    });
+  } catch (err) {
+    console.error("Send OTP Error:", err);
+    res.status(500).json({ success: false, message: "Failed to send OTP email" });
+  }
+}
+
 
 export async function createuser(req, res) {
   try {
-    const { name, email, password, location, role } = req.body;
+    const { email, otp, name, password } = req.body;
 
-    if (!name || !email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "name, email, and password are required",
-      });
-    }
-
-    if (await User.findOne({ email })) {
-      return res.status(409).json({
-        success: false,
-        message: "Email already exists",
+    if (!email || !otp || !name || !password) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Email, OTP, name, and password are required" 
       });
     }
 
@@ -27,23 +76,42 @@ export async function createuser(req, res) {
       });
     }
 
-    const user = await User.create({ name, email, password, location, role });
-    const refreshtoken = jwt.sign(
+    // 1. Fetch OTP from Redis
+    const storedOtp = await redis.get(`signup_otp:${email}`);
+
+    if (!storedOtp) {
+      return res.status(400).json({ success: false, message: "OTP has expired or is invalid" });
+    }
+
+    if (storedOtp !== otp) {
+      return res.status(401).json({ success: false, message: "Incorrect OTP" });
+    }
+
+    // 2. OTP is valid! Delete it from Redis so it can't be reused
+    await redis.del(`signup_otp:${email}`);
+
+    // 3. Hash the password before saving (Best Practice)
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // 4. Create the User
+    const user = await User.create({ 
+      name, 
+      email, 
+      password: hashedPassword, 
+      role: "user" 
+    });
+
+    // 5. Generate JWTs for automatic login after signup
+    const refreshToken = jwt.sign(
       { id: user._id, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
-    if (redis.status === "ready") {
-      await redis.set(
-        `refreshtoken:${user._id}`,
-        refreshtoken,
-        "EX",
-        7 * 24 * 60 * 60
-      );
-    }
+    await redis.set(`refreshtoken:${user._id}`, refreshToken, "EX", 7 * 24 * 60 * 60);
 
-    res.cookie("refreshtoken", refreshtoken, {
+    res.cookie("refreshtoken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
@@ -58,12 +126,13 @@ export async function createuser(req, res) {
 
     res.status(201).json({
       success: true,
-      message: "User created successfully",
-      user,
+      message: "Account verified and created successfully",
+      user: { _id: user._id, name: user.name, email: user.email },
       accessToken,
     });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    console.error("Signup Error:", err);
+    res.status(500).json({ success: false, message: "Failed to create account" });
   }
 }
 
