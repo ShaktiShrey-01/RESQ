@@ -4,10 +4,13 @@ import toast from 'react-hot-toast';
 import { Siren } from 'lucide-react'; 
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
-
+import { useDispatch } from 'react-redux';
+import { setCredentials } from '../store/authSlice';
+import resqLogo from '../assets/resq.png'; // Adjust relative path based on where your component file is
 export default function Login() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   const handleLoginSubmit = async (formData) => {
     setLoading(true);
@@ -17,8 +20,7 @@ export default function Login() {
         password: formData.password
       });
       
-      // Save the token and redirect to the dashboard/home
-      localStorage.setItem('token', response.data.accessToken);
+      dispatch(setCredentials({accessToken: response.data.accessToken, user: response.data.user}));
       toast.success("Welcome back!");
       navigate('/'); 
       
@@ -36,8 +38,8 @@ export default function Login() {
       {/* Brand Header */}
       <div className="mb-3 flex flex-col items-center transition-transform duration-300 hover:scale-105 sm:mb-4">
         <div className="mb-1.5 flex items-center gap-2 sm:mb-2 sm:gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-red-600 to-rose-700 text-white shadow-lg shadow-red-600/30 sm:h-12 sm:w-12">
-            <Siren className="h-5 w-5 sm:h-6 sm:w-6" />
+          <span className="flex h-10 w-10 items-center justify-center  sm:h-12 sm:w-12">
+            <img src={resqLogo} alt="RESQ Logo" className="h-10 w-10 sm:h-12 sm:w-12" />
           </span>
           <span className="text-3xl font-black tracking-tight text-[var(--global-text)] sm:text-4xl">
             RESQ

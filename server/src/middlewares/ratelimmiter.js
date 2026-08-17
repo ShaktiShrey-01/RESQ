@@ -13,7 +13,7 @@ const rateLimiter = async (req, res, next) => {
     }
 
     // Allow maximum 100 requests
-    if (requests > 2) {
+    if (requests > 10) {
       return res.status(429).json({
         success: false,
         message: "Too many requests. Please try again later.",

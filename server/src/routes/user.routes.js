@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { sendForgotPasswordOTP ,resetPasswordWithOTP,getme,createuser, login, refreshtoken,logoutall,sendSignupOTP } from "../controllers/user.controller.js";
+import { deleteAccount,sendForgotPasswordOTP ,resetPasswordWithOTP,getme,createuser, login, refreshtoken,logoutall,sendSignupOTP } from "../controllers/user.controller.js";
 import {verifyJWT} from "../middlewares/verifyjwt.js";    
 import rateLimiter from "../middlewares/ratelimmiter.js";
 const router = Router();
@@ -10,6 +10,7 @@ router.post("/refreshtoken", refreshtoken);
 router.post("/logoutall", verifyJWT, logoutall);
 router.get("/me", verifyJWT, getme);
 router.post("/send-signup-otp", sendSignupOTP);
+router.delete("/deleteaccount", verifyJWT, deleteAccount);
 // Add these to your user.routes.js file
 
 router.post('/sendForgotPasswordOTP', sendForgotPasswordOTP);

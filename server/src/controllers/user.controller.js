@@ -136,6 +136,7 @@ export async function createuser(req, res) {
   }
 }
 
+
 export async function login(req, res) {
   try {
     const { email, password } = req.body;
@@ -143,7 +144,7 @@ export async function login(req, res) {
     if (!email || !password) {
       return res.status(400).json({
         success: false,
-        message: "email and password are required",
+        message: "Email and password are required",
       });
     }
 
@@ -156,14 +157,10 @@ export async function login(req, res) {
       });
     }
 
-    if (password.length < 6) {
-      return res.status(400).json({
-        success: false,
-        message: "Password must be at least 6 characters long",
-      });
-    }
+    // FIX: Use bcrypt.compare to check the plain password against the hashed database password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
 
-    if (user.password !== password) {
+    if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
         message: "Invalid password",
@@ -262,11 +259,12 @@ export async function refreshtoken(req, res) {
       process.env.JWT_SECRET,
       { expiresIn: "15m" }
     );
+    const user = await User.findById(decoded.id).select("-password");
 
     res.status(200).json({
       success: true,
       message: "Token refreshed successfully",
-      accessToken,
+      accessToken,user
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -308,7 +306,7 @@ export async function getme(req,res){
         }
         res.status(200).json({
             success:true,
-            user
+            data:user
         });     
     }
     catch(err){
@@ -404,5 +402,31 @@ export async function resetPasswordWithOTP(req, res) {
   } catch (err) {
     console.error("Reset Password Error:", err);
     res.status(500).json({ success: false, message: "Failed to reset password" });
+  }
+}
+export async function deleteAccount(req, res) {
+  try {
+    const userId = req.user.id;
+
+    // Delete the user from the database
+    const deletedUser = await User.findByIdAndDelete(userId);
+
+    if (!deletedUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Optionally, you can also clear the refresh token from Redis
+    await redis.del(`refreshtoken:${userId}`);
+
+    res.status(200).json({
+      success: true,
+      message: "Account deleted successfully",
+    });
+  } catch (err) {
+    console.error("Delete Account Error:", err);
+    res.status(500).json({ success: false, message: "Failed to delete account" });
   }
 }

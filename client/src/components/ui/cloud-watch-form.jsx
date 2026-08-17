@@ -7,6 +7,8 @@ import { Button } from "./button";
 import { Input } from "./input";
 import { Label } from "./label";
 import { useNavigate } from "react-router-dom"; 
+// 🟢 1. IMPORT YOUR LOADER (Since they are in the same 'ui' folder)
+import Loader from "./Loader"; 
 
 export default function CloudWatchForm({
   mode = "login", // Can be "login", "signup", "otp", "forgot-password", or "reset-password"
@@ -222,7 +224,6 @@ export default function CloudWatchForm({
             );
           })}
 
-          {/* Only show Forgot Password on the Login mode */}
           {isLogin && (
             <div className="flex justify-end pt-1">
               <button 
@@ -234,18 +235,25 @@ export default function CloudWatchForm({
             </div>
           )}
 
+          {/* 🟢 2. THE BUTTON: Injects Loader when loading = true */}
           <Button
             type="submit"
             disabled={loading}
-            className="group mt-2 h-10 w-full rounded-xl bg-slate-900 text-white shadow-lg shadow-slate-900/10 transition-all duration-300 hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-xl hover:shadow-slate-900/20 active:translate-y-0 disabled:opacity-70"
+            className="group flex items-center justify-center mt-2 h-10 w-full rounded-xl bg-slate-900 text-white shadow-lg shadow-slate-900/10 transition-all duration-300 hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-xl hover:shadow-slate-900/20 active:translate-y-0 disabled:opacity-70"
           >
-            <span className="font-bold text-[0.95rem]">
-              {loading ? "Please wait..." : isOtp ? "Verify & Create Account" : isSignup ? "Send OTP" : isForgot ? "Send Reset Link" : isReset ? "Update Password" : "Sign in"}
-            </span>
-            {!loading && (
-              (isOtp || isReset) 
-                ? <ShieldCheck size={17} className="ml-2 transition-transform duration-300 group-hover:scale-110" /> 
-                : <ArrowRight size={17} className="ml-2 transition-transform duration-300 group-hover:translate-x-1" />
+            {loading ? (
+              <Loader small /> // 👈 Show mini green heartbeat if loading
+            ) : (
+              <>
+                {/* Otherwise, show normal text and the arrow/shield icon */}
+                <span className="font-bold text-[0.95rem]">
+                  {isOtp ? "Verify & Create Account" : isSignup ? "Send OTP" : isForgot ? "Send Reset Link" : isReset ? "Update Password" : "Sign in"}
+                </span>
+                {(isOtp || isReset) 
+                  ? <ShieldCheck size={17} className="ml-2 transition-transform duration-300 group-hover:scale-110" /> 
+                  : <ArrowRight size={17} className="ml-2 transition-transform duration-300 group-hover:translate-x-1" />
+                }
+              </>
             )}
           </Button>
         </form>

@@ -1,29 +1,43 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux'; // 👈 IMPORT THIS
+import { logOut } from '../store/authSlice'; // 👈 IMPORT THIS
 import { LogOut, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '../lib/utils';
+import api from '../services/api';
 
 export default function LogoutBtn({ full = false }) {
   const [status, setStatus] = useState('idle');
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
-  const handleLogout = () => {
-    if (status !== 'idle') return;
-    setStatus('loading');
-    
-    localStorage.removeItem('token');
-    setTimeout(() => {
+  const handleLogout = async () => {
+    try {
+      // 1. Trigger the loading animation
+      setStatus('loading');
+
+      // 2. Call backend (Notice we removed the extra '/api' because Axios base URL has it)
+      await api.post('/users/logoutall');
+
+      // 3. Trigger the success animation
       setStatus('done');
       toast.success('Logged out successfully');
+
+      // 4. Wait just a tiny moment so the user can see the cool checkmark animation!
       setTimeout(() => {
-        navigate('/login');
-        setStatus('idle');
-      }, 500);
-    }, 900);
+        dispatch(logOut()); // 👈 VERY IMPORTANT: Clears Redux so you don't get kicked back to Home!
+        navigate('/login'); // Redirect to login
+      }, 800);
+
+    } catch (error) {
+      setStatus('idle'); // Reset button if it fails
+      console.error('Error during logout:', error);
+      // We don't need a toast.error here because your api.js interceptor handles it automatically!
+    }
   };
 
-  const label = status === 'loading' ? 'Logging out ' : status === 'done' ? 'See you soon!' : 'Logout';
+  const label = status === 'loading' ? 'Logging out...' : status === 'done' ? 'See you soon!' : 'Logout';
 
   return (
     <button
@@ -34,7 +48,6 @@ export default function LogoutBtn({ full = false }) {
       className={cn(
         'group relative flex items-center overflow-hidden rounded-full text-[0.95rem] font-bold shadow-md',
         'transition-all duration-300 ease-out active:scale-95 disabled:cursor-not-allowed',
-        // CHANGED: Pure Red Button Colors
         'bg-red-600 text-white hover:bg-red-500 hover:shadow-lg',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400',
         full

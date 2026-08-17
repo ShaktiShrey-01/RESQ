@@ -1,69 +1,52 @@
-import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React, { Suspense, lazy } from 'react'; // 👈 IMPORT LAZY AND SUSPENSE
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { Provider, useSelector } from 'react-redux';
-import { store } from './store/store';
-import ForgotPassword from './pages/ForgotPassword';
-import Layout from './layout/Layout';
-import Home from './pages/Home';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
 
-// Import the Grid background instead of Voxel
-import { GridVignetteBackground } from './components/ui/vignette-grid-background';
+// Static Layouts & Guards
+import { GridVignetteBackground } from './components/ui/GridVignetteBackground';
+import ProtectedRoute from './components/ProtectedRoute';
+import PublicRoute from './components/PublicRoute';
+import Layout from './layout/Layout'; 
+import Loader from './components/ui/Loader'; // 👈 IMPORT YOUR LOADER
 
-function ThemeWrapper({ children }) {
-  const theme = useSelector((state) => state.theme.theme);
+// 🟢 LAZY LOADED ROUTES: These only download when the user visits them!
+const Login = lazy(() => import('./pages/Login'));
+const Signup = lazy(() => import('./pages/Signup'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const Home = lazy(() => import('./pages/Home'));
+const Profile = lazy(() => import('./pages/Profile'));
 
-  useEffect(() => {
-    const root = document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-      root.classList.remove('light');
-    } else {
-      root.classList.add('light');
-      root.classList.remove('dark');
-    }
-  }, [theme]);
-
+function App() {
   return (
-    <div className="relative min-h-[100dvh] overflow-x-hidden">
-      {/* GLOBAL GRID BACKGROUND FOR ALL PAGES */}
-      <GridVignetteBackground 
-        horizontalVignetteSize={100} 
-        verticalVignetteSize={100} 
-        className="opacity-80 dark:opacity-60" 
-      />
-      
-      {/* Page Content Container */}
-      <div className="relative z-10 flex min-h-[100dvh] flex-col">
-        {children}
+    <div className="relative min-h-[100dvh] w-full flex flex-col">
+      <GridVignetteBackground />
+
+      <div className="relative z-10 flex-1 flex flex-col">
+        <Toaster position="top-center" reverseOrder={false} />
+
+        {/* 🟢 SUSPENSE: Shows the Heartbeat Loader while fetching the lazy route */}
+        <Suspense fallback={<Loader fullScreen text="Loading Page" />}>
+          <Routes>
+            
+            <Route element={<PublicRoute />}>
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+            </Route>
+
+            <Route element={<Layout />}>
+              <Route element={<ProtectedRoute />}>
+                <Route path="/" element={<Home />} />
+                <Route path="/profile" element={<Profile />} />
+              </Route>
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
+
+          </Routes>
+        </Suspense>
       </div>
     </div>
   );
 }
 
-export default function App() {
-  return (
-    <Provider store={store}>
-      <ThemeWrapper>
-        <BrowserRouter>
-          <Toaster position="top-center" />
-          <Routes>
-            {/* Routes WITH Navbar and Footer */}
-            <Route element={<Layout />}>
-              <Route path="/" element={<Home />} />
-            </Route>
-            
-            {/* Routes WITHOUT Navbar and Footer (Authentication Pages) */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            
-            <Route path="*" element={<Navigate to="/" />} />
-          </Routes>
-        </BrowserRouter>
-      </ThemeWrapper>
-    </Provider>
-  );
-}
+export default App;
