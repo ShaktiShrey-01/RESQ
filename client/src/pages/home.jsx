@@ -64,6 +64,21 @@ export default function Home() {
             </div>
           </button>
         </section>
+          <section>
+          <button onClick={() => navigate('/report')} className="w-full relative group overflow-hidden rounded-2xl bg-gradient-to-r from-red-600 via-rose-600 to-red-700 p-8 text-left shadow-2xl shadow-red-900/30 hover:shadow-red-600/40 transition-all duration-300 transform active:scale-[0.99]">
+            <div className="absolute right-0 top-0 -mr-6 -mt-6 w-36 h-36 rounded-full bg-white/10 blur-xl group-hover:scale-150 transition-all duration-500" />
+            <div className="relative z-10 flex items-center justify-between">
+              <div>
+                <span className="inline-block px-3 py-1 mb-3 text-xs font-bold uppercase tracking-wider bg-black/30 rounded-full text-red-100 border border-white/10">Instant SOS</span>
+                <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">REPORT AN EMERGENCY</h1>
+                <p className="mt-1 text-red-100/80 text-sm font-medium">Broadcast your GPS coordinates to all active nearby responders</p>
+              </div>
+              <div className="hidden sm:flex w-14 h-14 rounded-full bg-white text-red-600 items-center justify-center shadow-lg group-hover:translate-x-1 transition-transform">
+                <ArrowRight className="w-6 h-6 stroke-[3]" />
+              </div>
+            </div>
+          </button>
+        </section>
 
         <section className="flex-1 flex flex-col">
           <div className="flex items-center justify-between mb-4">
@@ -105,6 +120,7 @@ export default function Home() {
             ))}
           </div>
         </section>
+        
       </main>
     </div>
   );

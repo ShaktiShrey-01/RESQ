@@ -315,3 +315,94 @@ export async function getme(req,res){
         res.status(500).json({success:false,message:err.message});
     }
 }
+
+
+// Add this to your existing controllers in user.controller.js
+
+export async function sendForgotPasswordOTP(req, res) {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, message: "Email is required" });
+    }
+
+    // 1. Check if user actually exists
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ success: false, message: "No account found with this email" });
+    }
+
+    // 2. Generate 6-digit random OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // 3. Store OTP in Redis (5-minute expiration)
+    if (redis.status === "ready") {
+      await redis.set(`reset_otp:${email}`, otp, "EX", 300);
+    } else {
+      throw new Error("Redis is not connected");
+    }
+
+    // 4. Send the Email
+    const mailOptions = {
+      from: `"RESQ Emergency" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "Reset your RESQ Password",
+      text: `Your password reset code is ${otp}. It expires in 5 minutes.`,
+      html: `<h2>Your password reset code is <strong>${otp}</strong>.</h2><p>It will expire in 5 minutes. If you didn't request this, ignore this email.</p>`,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.status(200).json({
+      success: true,
+      message: "Reset OTP sent successfully to your email",
+    });
+  } catch (err) {
+    console.error("Forgot Password OTP Error:", err);
+    res.status(500).json({ success: false, message: "Failed to send reset email" });
+  }
+}
+
+export async function resetPasswordWithOTP(req, res) {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ success: false, message: "Email, OTP, and new password are required" });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: "Password must be at least 6 characters long" });
+    }
+
+    // 1. Fetch OTP from Redis
+    const storedOtp = await redis.get(`reset_otp:${email}`);
+    if (!storedOtp) {
+      return res.status(400).json({ success: false, message: "OTP has expired or is invalid" });
+    }
+    if (storedOtp !== otp) {
+      return res.status(401).json({ success: false, message: "Incorrect OTP" });
+    }
+
+    // 2. OTP is valid! Delete it from Redis
+    await redis.del(`reset_otp:${email}`);
+
+    // 3. Hash the new password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // 4. Update the user's password
+    await User.findOneAndUpdate(
+      { email },
+      { password: hashedPassword }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Password reset successfully. You can now log in.",
+    });
+  } catch (err) {
+    console.error("Reset Password Error:", err);
+    res.status(500).json({ success: false, message: "Failed to reset password" });
+  }
+}

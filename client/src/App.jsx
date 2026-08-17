@@ -3,15 +3,14 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { Provider, useSelector } from 'react-redux';
 import { store } from './store/store';
-
+import ForgotPassword from './pages/ForgotPassword';
 import Layout from './layout/Layout';
 import Home from './pages/Home';
-// import Report from './pages/Report';
-// import Profile from './pages/Profile';
-// import Login from './pages/Login';
+import Login from './pages/Login';
+import Signup from './pages/Signup';
 
-import { DotPattern } from './components/ui/dot-pattern';
-import { cn } from './lib/utils';
+// Import the Grid background instead of Voxel
+import { GridVignetteBackground } from './components/ui/vignette-grid-background';
 
 function ThemeWrapper({ children }) {
   const theme = useSelector((state) => state.theme.theme);
@@ -28,21 +27,16 @@ function ThemeWrapper({ children }) {
   }, [theme]);
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden">
-      {/* 
-        CHANGED: Added a linear-gradient mask! 
-        This completely erases the dots behind the Navbar (top 110px) 
-        and the Footer (bottom 80px). Now their background is strictly the solid page bg! 
-      */}
-      <DotPattern
-        className={cn(
-          "fixed inset-0 z-0",
-          "[-webkit-mask-image:linear-gradient(to_bottom,transparent_0%,transparent_110px,white_160px,white_calc(100%-160px),transparent_calc(100%-80px),transparent_100%)]",
-          "[mask-image:linear-gradient(to_bottom,transparent_0%,transparent_110px,white_160px,white_calc(100%-160px),transparent_calc(100%-80px),transparent_100%)]"
-        )}
+    <div className="relative min-h-[100dvh] overflow-x-hidden">
+      {/* GLOBAL GRID BACKGROUND FOR ALL PAGES */}
+      <GridVignetteBackground 
+        horizontalVignetteSize={100} 
+        verticalVignetteSize={100} 
+        className="opacity-80 dark:opacity-60" 
       />
       
-      <div className="relative z-10 flex min-h-screen flex-col">
+      {/* Page Content Container */}
+      <div className="relative z-10 flex min-h-[100dvh] flex-col">
         {children}
       </div>
     </div>
@@ -56,12 +50,16 @@ export default function App() {
         <BrowserRouter>
           <Toaster position="top-center" />
           <Routes>
+            {/* Routes WITH Navbar and Footer */}
             <Route element={<Layout />}>
               <Route path="/" element={<Home />} />
-              {/* <Route path="/report" element={<Report />} /> */}
-              {/* <Route path="/profile" element={<Profile />} /> */}
             </Route>
-            {/* <Route path="/login" element={<Login />} /> */}
+            
+            {/* Routes WITHOUT Navbar and Footer (Authentication Pages) */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </BrowserRouter>

@@ -4,26 +4,31 @@
 
 @layer base {
   :root {
-    /* Sharper, deeper intensity for light mode text */
     --global-text: #121f23;
-    --global-bg: #f8fafc; 
+    --global-bg: #f8fafc;
+    --grid-color: rgba(0, 0, 0, 0.15); 
   }
 
   .dark {
-    /* Brighter, sharper luminous intensity for dark mode text */
     --global-text: #dce0eb;
-    --global-bg: #000000; 
+    --global-bg: #000000;
+    --grid-color: rgba(255, 255, 255, 0.15); 
   }
 
   body {
     color: var(--global-text);
     background-color: var(--global-bg);
-    /* Increased global text size and added crisp anti-aliasing */
     font-size: 1.05rem; 
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    transition: color 0.5s ease, background-color 0.5s ease;
+    transition: color 0.3s ease, background-color 0.3s ease; 
   }
+}
+
+/* NEW: Smooth continuous floating animation for the Cloud */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-12px); }
 }
 
 @keyframes logout-slide {

@@ -3,12 +3,23 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import userroutes from "./routes/user.routes.js";
 import emergencyroutes from "./routes/emergency.routes.js";
+
 const app = express();
 
+// 1. CORS MUST BE AT THE VERY TOP (Before any routes or parsers)
+app.use(cors({
+  origin: "http://localhost:5173", // Exact frontend URL
+  credentials: true,               // Required for cookies/tokens
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
+
+// 2. Body & Cookie Parsers
 app.use(cookieParser());
 app.use(express.json());
-app.use(cors());
 
+// 3. Routes
+// NOTE: Your routes start with /api/users
 app.use("/api/users", userroutes);
 app.use("/api/emergencies", emergencyroutes);
 
@@ -23,6 +34,7 @@ app.get("/api/test", (req, res) => {
   });
 });
 
+// Error Handlers
 app.use((err, req, res, next) => {
   if (err?.type === "entity.parse.failed") {
     return res.status(400).json({
@@ -30,7 +42,6 @@ app.use((err, req, res, next) => {
       message: "Invalid JSON body. Send raw JSON with double quotes only.",
     });
   }
-
   next(err);
 });
 
