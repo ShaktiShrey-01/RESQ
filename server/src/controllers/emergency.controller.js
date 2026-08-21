@@ -688,3 +688,68 @@ const io = req.app.get("io");// Import the io instance from server.js
 };
 
 
+// ======================================
+// GET NEARBY (ACTIVE) EMERGENCIES
+// ======================================
+export async function getNearbyEmergencies(req, res) {
+  try {
+    const activeEmergencies = await emergency.find({ 
+      status: "SEARCHING", 
+      helper: null 
+    })
+    .populate("createdBy", "name email")
+    .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      data: activeEmergencies,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+// ======================================
+// CANCEL EMERGENCY
+// ======================================
+export async function cancelEmergency(req, res) {
+  try {
+    const { id } = req.params;
+    const emergencyToCancel = await emergency.findById(id);
+
+    // 1. Check if it exists
+    if (!emergencyToCancel) {
+      return res.status(404).json({ success: false, message: "Emergency not found" });
+    }
+
+    // 2. Security: Only the person who created it can cancel it
+    if (emergencyToCancel.createdBy.toString() !== req.user.id.toString()) {
+      return res.status(403).json({ success: false, message: "Only the creator can cancel this emergency" });
+    }
+
+    // 3. Prevent cancelling if already resolved
+    if (['RESOLVED', 'CLOSED'].includes(emergencyToCancel.status)) {
+      return res.status(400).json({ success: false, message: "This emergency is already closed" });
+    }
+
+    // 4. Update the status
+    emergencyToCancel.status = "CLOSED";
+    emergencyToCancel.resolvedAt = new Date(); // Log when it was cancelled
+    await emergencyToCancel.save();
+
+    // 5. If a helper was already on the way, tell them to stop!
+    const io = req.app.get("io");
+    if (io && emergencyToCancel.helper) {
+      io.to(`user:${emergencyToCancel.helper}`).emit("EMERGENCY_STATUS_UPDATED", {
+        emergencyId: emergencyToCancel._id,
+        status: "CLOSED",
+        message: "The requester has cancelled this emergency."
+      });
+    }
+
+    return res.status(200).json({ success: true, message: "Emergency cancelled successfully" });
+  } catch (error) {
+    console.error("Cancel emergency error:", error);
+    return res.status(500).json({ success: false, message: "Failed to cancel emergency" });
+  }
+}

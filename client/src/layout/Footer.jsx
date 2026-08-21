@@ -1,5 +1,5 @@
 import { Siren, Phone, MapPin } from 'lucide-react';
-
+import resqLogo from '../assets/resq.png'; 
 export default function Footer() {
   return (
     <footer className="relative z-10 w-full flex justify-center px-1 pb-3 sm:px-4 mt-auto">
@@ -9,9 +9,15 @@ export default function Footer() {
         
         {/* Left: Brand */}
         <div className="flex items-center gap-1.5 sm:gap-3 transition-transform hover:scale-105 cursor-pointer shrink-0">
-          <span className="flex h-6 w-6 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-gradient-to-br from-red-600 to-rose-700 text-white shadow-md shadow-red-600/30">
-            <Siren className="h-3 w-3 sm:h-4 sm:w-4" />
-          </span>
+         <span className="relative flex h-10 w-10 items-center justify-center overflow-visible">
+             <img 
+               src={resqLogo} 
+               alt="RESQ Logo" 
+               loading="lazy"
+               /* 🟢 KEEP THE BIG LOGO SIZE: It will now float outside its box and hover over the navbar seamlessly! */
+               className="absolute h-15 w-16 sm:h-20 sm:w-20 object-contain" 
+             />
+           </span>
           <span className="text-sm sm:text-2xl font-black tracking-tight text-black dark:text-white hidden min-[320px]:block">
             RESQ
           </span>

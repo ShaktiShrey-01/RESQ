@@ -1,7 +1,10 @@
 import { createSlice } from '@reduxjs/toolkit';
 
+// 1. Check storage BEFORE setting the initial state
+const savedTheme = localStorage.getItem('theme') || 'light';
+
 const initialState = {
-  theme: 'light', // Defaulting to light mode
+  theme: savedTheme, 
 };
 
 const themeSlice = createSlice({
@@ -9,7 +12,11 @@ const themeSlice = createSlice({
   initialState,
   reducers: {
     toggleTheme: (state) => {
+      // Flip the state
       state.theme = state.theme === 'light' ? 'dark' : 'light';
+      
+      // 2. Save the new choice to storage immediately!
+      localStorage.setItem('theme', state.theme);
     },
   },
 });
