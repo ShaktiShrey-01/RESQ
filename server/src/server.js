@@ -15,19 +15,15 @@ dotenv.config();
 
 const PORT = process.env.PORT || 8000;
 
-
 // ======================================================
 // CREATE HTTP SERVER
 // Express + Socket.IO use the same server.
 // ======================================================
-
 const server = http.createServer(app);
-
 
 // ======================================================
 // CREATE SOCKET.IO SERVER
 // ======================================================
-
 const io = new Server(server, {
   cors: {
     origin: "http://localhost:5173",
@@ -35,101 +31,63 @@ const io = new Server(server, {
   },
 });
 
-
 // ======================================================
 // MAKE IO AVAILABLE TO CONTROLLERS
 // ======================================================
-
 app.set("io", io);
-
 
 // ======================================================
 // SOCKET.IO CONNECTION
 // ======================================================
-
 io.on("connection", (socket) => {
-
   console.log("Socket connected:", socket.id);
-
 
   // ====================================================
   // USER PRIVATE ROOM
   // ====================================================
-
   socket.on("joinUserRoom", (userId) => {
     if (!userId) return;
     socket.join(`user:${userId}`);
     console.log(`User ${userId} joined room user:${userId}`);
   });
 
-
   // ====================================================
-  // LOCATION UPDATE
+  // LOCATION UPDATE (LIVE TRACKING RELAY)
   // ====================================================
-
   socket.on("LOCATION_UPDATE", async (data) => {
     try {
       if (!data) return;
-
       const { userId, emergencyId, lat, lng } = data;
 
-      // =================================================
-      // BASIC VALIDATION
-      // =================================================
       if (!userId || lat === undefined || lng === undefined) {
-        console.log("Invalid LOCATION_UPDATE");
         return;
       }
 
-      // =================================================
-      // UPDATE CURRENT USER LOCATION IN REDIS
-      // =================================================
+      // Update current user location in Redis
       await updateUserLocation({ userId, lat, lng });
-      console.log(`Location updated for user ${userId}`);
 
-      // =================================================
-      // IF USER IS NOT HELPING AN EMERGENCY, STOP HERE
-      // =================================================
       if (!emergencyId) {
         return;
       }
 
-      // =================================================
-      // FIND THE EMERGENCY
-      // =================================================
       const emergencyData = await emergency.findById(emergencyId);
-
       if (!emergencyData) {
-        console.log("Emergency not found:", emergencyId);
         return;
       }
 
-      // =================================================
-      // SECURITY CHECK
-      // =================================================
-      if (
-        !emergencyData.helper ||
-        emergencyData.helper.toString() !== String(userId)
-      ) {
-        console.log(`User ${userId} is not assigned to emergency ${emergencyId}`);
+      // Security check: Make sure this user is the assigned helper
+      if (!emergencyData.helper || emergencyData.helper.toString() !== String(userId)) {
         return;
       }
 
-      // =================================================
-      // CHECK ACTIVE EMERGENCY STATUS
-      // =================================================
-      if (emergencyData.status !== "ON_THE_WAY") {
+      // 🟢 FIX 1: Allow GPS updates even if they are just ASSIGNED or ARRIVED
+      if (!["ASSIGNED", "ON_THE_WAY", "ARRIVED"].includes(emergencyData.status)) {
         return;
       }
 
-      // =================================================
-      // GET REQUESTER who created the emergency
-      // =================================================
       const requesterId = emergencyData.createdBy.toString();
 
-      // =================================================
-      // SEND LIVE LOCATION ONLY TO REQUESTER of helper 
-      // =================================================
+      // 🟢 THE RELAY TOWER: Forward helper's live GPS to the Requester
       io.to(`user:${requesterId}`).emit("HELPER_LOCATION_UPDATED", {
         emergencyId: emergencyData._id,
         helperId: userId,
@@ -137,63 +95,49 @@ io.on("connection", (socket) => {
         lng: Number(lng),
       });
 
-      // =================================================
-      // AUTOMATIC ARRIVED DETECTION
-      // =================================================
-      // MongoDB stores coordinates as [longitude, latitude]
+      // 🟢 AUTOMATIC ARRIVAL DETECTION (Failsafe in Backend)
       const [emLng, emLat] = emergencyData.location.coordinates;
-
-      // Calculate distance in meters using Haversine formula
       const distanceInMeters = calculateDistance(
-        Number(lat), Number(lng), // Helper's current location
-        emLat, emLng              // Emergency's original location
+        Number(lat), Number(lng), 
+        emLat, emLng              
       );
 
-      // If the helper is within 50 meters, trigger ARRIVED status
-      if (distanceInMeters <= 50) {
-        console.log(`📍 Helper ${userId} arrived at emergency ${emergencyId}`);
+      // Trigger automatic ARRIVED status if within 50 meters
+      if (distanceInMeters <= 50 && emergencyData.status !== "ARRIVED") {
+        console.log(`📍 Helper ${userId} automatically arrived at emergency ${emergencyId}`);
 
-        // Update MongoDB state
         emergencyData.status = "ARRIVED";
         emergencyData.arrivedAt = new Date();
         await emergencyData.save();
 
-        // Notify Requester
         io.to(`user:${requesterId}`).emit("EMERGENCY_STATUS_UPDATED", {
           emergencyId: emergencyData._id,
           status: "ARRIVED",
           message: "The helper has arrived at your location.",
         });
 
-        // Notify Helper
         io.to(`user:${userId}`).emit("EMERGENCY_STATUS_UPDATED", {
           emergencyId: emergencyData._id,
           status: "ARRIVED",
           message: "You have arrived at the destination.",
         });
       }
-
     } catch (error) {
       console.error("LOCATION_UPDATE error:", error);
     }
   });
 
-
   // ====================================================
   // DISCONNECT
   // ====================================================
-
   socket.on("disconnect", () => {
     console.log("Socket disconnected:", socket.id);
   });
-
 });
-
 
 // ======================================================
 // START SERVER
 // ======================================================
-
 const startServer = async () => {
   try {
     await connectdb();
@@ -202,10 +146,11 @@ const startServer = async () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`🔌 Socket.IO running on port ${PORT}`);
     });
-    // Start the Stale Location Checker (runs every 10 seconds)
-      setInterval(() => {
-        checkStaleLocations(io);
-      }, 10000);
+    
+    // Start the Stale Location Checker
+    setInterval(() => {
+      checkStaleLocations(io);
+    }, 10000);
 
   } catch (error) {
     console.error("❌ Failed to start server:", error);
