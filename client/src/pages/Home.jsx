@@ -63,9 +63,7 @@ export default function Home() {
     
     socket.emit("joinUserRoom", userId);
 
-    // 🟢 CRITICAL FIX: Centralized Navigation to prevent double toasts
     const handleAcceptedNavigation = (emergencyId) => {
-      // The { id } property forces React to only show this toast once, even if called 3 times!
       toast.success("A responder is on the way!", { id: `otw-toast-${emergencyId}` });
       navigate(`/tracking/${emergencyId}`);
     };
@@ -93,31 +91,20 @@ export default function Home() {
         const distance = calculateDistanceKm(currentLocRef.current.lat, currentLocRef.current.lng, emLat, emLng);
         
         if (!isNaN(distance) && distance <= 5.0) {
-          setNearbyEmergencies((prev) => {
-            if (prev.some(em => String(em._id) === String(data.emergencyId))) return prev;
-            
-            toast.error(`New ${data.priority} Emergency nearby!`, { id: `new-em-${data.emergencyId}` });
-            sendSystemNotification("🚨 Urgent: Emergency Nearby!", `${data.type} emergency reported ${distance.toFixed(1)} km away. Tap to view.`);
-            
-            // 🟢 CRITICAL FIX: Manually build the exact JSON structure React expects
-            // This injects it directly into the UI without waiting for a slow API call
-            const instantEmergencyCard = {
-              _id: data.emergencyId,
-              type: data.type,
-              description: data.description,
-              location: data.location,
-              address: data.address,
-              priority: data.priority,
-              status: data.status,
-              createdAt: new Date().toISOString(),
-              createdBy: {
-                _id: data.creatorId,
-                name: data.creatorName
-              }
-            };
-            
-            return [instantEmergencyCard, ...prev];
-          });
+          // 1. Show the pop-up instantly
+          toast.error(`New ${data.priority} Emergency nearby!`, { id: `new-em-${data.emergencyId}` });
+          sendSystemNotification(
+            "🚨 Urgent: Emergency Nearby!", 
+            `${data.type} emergency reported ${distance.toFixed(1)} km away. Tap to view.`
+          );
+          
+          // 🟢 CRASH FIX: Do NOT manually inject fake data into React state.
+          // Wait exactly 500ms for MongoDB to fully index the new emergency, then fetch the perfect data.
+          setTimeout(() => {
+            if (currentLocRef.current) {
+              fetchNearby(currentLocRef.current.lat, currentLocRef.current.lng);
+            }
+          }, 500);
         }
       } else {
         setTimeout(() => {
