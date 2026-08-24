@@ -121,7 +121,7 @@ export async function createuser(req, res) {
     res.cookie("refreshtoken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: "none",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -192,7 +192,7 @@ export async function login(req, res) {
     res.cookie("refreshtoken", refreshtoken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: "none",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -257,7 +257,7 @@ export async function refreshtoken(req, res) {
     res.cookie("refreshtoken", newrefreshtoken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: "none",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
