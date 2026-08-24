@@ -332,55 +332,41 @@ export default function LiveTracking() {
   const displayAddress = emergency.location?.address !== 'GPS Location Acquired' ? emergency.location?.address : null;
 
   return (
-    <div className="w-full h-[100dvh] bg-slate-100 dark:bg-slate-950 flex flex-col md:flex-row relative overflow-hidden">
+    <div className="w-full h-[100dvh] bg-slate-100 dark:bg-slate-950 grid grid-cols-1 grid-rows-[auto_1fr_auto] md:grid-cols-[420px_1fr] lg:grid-cols-[460px_1fr] md:grid-rows-[auto_1fr] relative overflow-hidden">
       
       <ChatModal 
-        isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
-        messages={messages} 
-        currentUserId={currentUserId}
-        otherPerson={otherPerson}
-        newMessage={newMessage} 
-        setNewMessage={setNewMessage}
-        onSendMessage={handleSendMessage}
-        chatEndRef={chatEndRef}
+        isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} messages={messages} 
+        currentUserId={currentUserId} otherPerson={otherPerson} newMessage={newMessage} 
+        setNewMessage={setNewMessage} onSendMessage={handleSendMessage} chatEndRef={chatEndRef}
       />
 
-      {/* Desktop Sidebar / Mobile Stack Wrapper */}
-      <div className="flex flex-col md:w-[420px] lg:w-[460px] md:h-full md:border-r border-slate-200 dark:border-slate-800 z-20 bg-white dark:bg-slate-900 justify-between shrink-0 shadow-xl overflow-y-auto">
-        <TrackingTopPanel 
-          narrativeTitle={narrativeTitle}
-          narrativeSub={narrativeSub} 
-          unreadCount={unreadCount}
-          onOpenChat={() => setIsChatOpen(true)}
-          onBack={() => navigate('/')} 
-        />
+      {/* Desktop Sidebar Background (Hidden on mobile) */}
+      <div className="hidden md:block col-start-1 row-start-1 row-span-2 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 z-10 shadow-xl"></div>
 
-        <TrackingBottomPanel 
-          isRequester={isRequester}
-          isHelper={isHelper}
-          otherPerson={otherPerson} 
-          emergency={emergency}
-          isWithin100m={isWithin100m}
-          isResolving={isResolving} 
-          isDropping={isDropping}
-          isCanceling={isCanceling}
-          displayAddress={displayAddress} 
-          onResolve={handleResolveEmergency}
-          onDrop={handleDropMission} 
-          onCancel={handleCancelEmergency}
-          onOpenChat={() => setIsChatOpen(true)} 
+      {/* 1. Top Panel */}
+      <div className="col-start-1 row-start-1 z-20">
+        <TrackingTopPanel 
+          narrativeTitle={narrativeTitle} narrativeSub={narrativeSub} 
+          unreadCount={unreadCount} onOpenChat={() => setIsChatOpen(true)} onBack={() => navigate('/')} 
         />
       </div>
 
-      {/* Map Expands Across Full Height on Desktop */}
-      <div className="flex-1 h-full w-full relative z-0">
+      {/* 2. Map (Sandwiched in mobile, on the right in PC) */}
+      <div className="col-start-1 row-start-2 md:col-start-2 md:row-start-1 md:row-span-2 relative z-0 w-full h-full">
         <TrackingMap 
-          emergencyLat={emergencyLat}
-          emergencyLng={emergencyLng} 
-          helperCoords={helperCoords}
-          routeLine={routeLine}
-          status={emergency.status} 
+          emergencyLat={emergencyLat} emergencyLng={emergencyLng} 
+          helperCoords={helperCoords} routeLine={routeLine} status={emergency.status} 
+        />
+      </div>
+
+      {/* 3. Bottom Panel */}
+      <div className="col-start-1 row-start-3 md:col-start-1 md:row-start-2 md:self-end z-20 w-full">
+        <TrackingBottomPanel 
+          isRequester={isRequester} isHelper={isHelper} otherPerson={otherPerson} 
+          emergency={emergency} isWithin100m={isWithin100m} isResolving={isResolving} 
+          isDropping={isDropping} isCanceling={isCanceling} displayAddress={displayAddress} 
+          onResolve={handleResolveEmergency} onDrop={handleDropMission} 
+          onCancel={handleCancelEmergency} onOpenChat={() => setIsChatOpen(true)} 
         />
       </div>
     </div>

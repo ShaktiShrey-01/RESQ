@@ -10,7 +10,8 @@ export default function TrackingBottomPanel({
   const defaultAvatar = 'https://res.cloudinary.com/dxjzq6f0g/image/upload/v1690912345/avatars/default-avatar.png';
 
   return (
-    <div className="w-full bg-white dark:bg-slate-900 rounded-t-[2rem] shadow-[0_-15px_40px_rgba(0,0,0,0.1)] p-6 z-20 pb-8 relative mt-[-20px]">
+// Just change the main wrapper div on line 9:
+<div className="w-full bg-white dark:bg-slate-900 rounded-t-[2rem] md:rounded-none shadow-[0_-15px_40px_rgba(0,0,0,0.1)] md:shadow-none p-6 z-20 pb-8 relative mt-[-20px] md:mt-0">
       <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mx-auto mb-6"></div>
 
       {/* 🟢 SWIGGY STYLE PERSON DETAILS CARD */}

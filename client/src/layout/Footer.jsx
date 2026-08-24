@@ -39,7 +39,7 @@ export default function Footer() {
 
         {/* Center: Copyright */}
         <p className="text-[9px] sm:text-[0.9rem] font-bold text-black/80 dark:text-white/80 text-center truncate px-1 sm:px-0">
-          © {new Date().getFullYear()} <span className="hidden sm:inline">RESQ. Connecting responders in seconds.</span>
+          © {new Date().getFullYear()} <span className="hidden sm:inline">RESQ. Fast, reliable help when every second counts.</span>
         </p>
 
         {/* Right: Developer Social Links */}

@@ -46,7 +46,7 @@ export default function Login() {
           </span>
         </div>
         <p className="max-w-[280px] text-center text-[0.75rem] font-bold leading-snug opacity-60 sm:max-w-xs sm:text-[0.9rem]">
-          Connecting responders in seconds when it matters most.
+          Fast, reliable help when every second counts
         </p>
       </div>
 

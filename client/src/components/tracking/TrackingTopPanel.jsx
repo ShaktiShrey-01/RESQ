@@ -9,7 +9,8 @@ export default function TrackingTopPanel({
   onBack
 }) {
   return (
-    <div className="w-full bg-white dark:bg-slate-900 md:rounded-none rounded-b-[2rem] shadow-sm z-20 flex flex-col pt-5 pb-5 px-6 relative border-b border-slate-100 dark:border-slate-800">
+// Just change the main wrapper div on line 12:
+<div className="w-full bg-white dark:bg-slate-900 md:rounded-none rounded-b-[2rem] shadow-md md:shadow-none z-20 flex flex-col pt-5 pb-5 px-6 relative border-b border-slate-100 dark:border-slate-800">
       <div className="flex items-center justify-between">
         <button
           onClick={onBack}
