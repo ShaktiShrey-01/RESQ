@@ -112,6 +112,7 @@ Allow Location: When prompted, allow the browser to access your GPS location.
 Request Help: Click the "Create Emergency" button, select the emergency type, and broadcast your location.
 Respond to Emergencies: If you are within 5km of an active emergency, it will appear on your radar. Click "Accept" to become the responder.
 Live Tracking: Once matched, both users are taken to a live map showing real-time location updates, estimated arrival times, and a live chat interface to coordinate the rescue.
+<br/>
 🌍 Deployment
 Frontend: Deployed on Netlify
 Backend: Deployed on Render with configured IPv4 DNS flags to allow Nodemailer SMTP connections.
