@@ -12,7 +12,7 @@ function AuthInitializer({ children }) {
         const checkLogin = async () => {
             try {
                 const res = await axios.post(
-                    "http://localhost:8000/api/users/refreshtoken", 
+                    `${import.meta.env.VITE_BACKEND_URL}/api/users/refreshtoken`, 
                     {}, 
                     { withCredentials: true }
                 );
