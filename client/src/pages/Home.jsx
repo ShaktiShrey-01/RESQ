@@ -7,7 +7,6 @@ import api from '../services/api';
 
 import EmergencyCreator from '../components/home/EmergencyCreator';
 import EmergencyRadar from '../components/home/EmergencyRadar';
-// 🟢 IMPORT NEW ICONS FOR THE HOW IT WORKS SECTION
 import { ShieldAlert, Radio, HeartHandshake } from 'lucide-react';
 
 const calculateDistanceKm = (lat1, lon1, lat2, lon2) => {
@@ -44,15 +43,27 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-   if (!user) return;
+    if (!user) return;
 
     socketRef.current = io(import.meta.env.VITE_BACKEND_URL, { withCredentials: true });
     const socket = socketRef.current;
     const userId = user.id || user._id;
 
+    // 🟢 REUSABLE FETCH FUNCTION: Used for initial load, wake-ups, and GPS lag
+    const fetchNearby = (lat, lng) => {
+      api.get(`/emergencies/nearby?lat=${lat}&lng=${lng}`)
+         .then(res => setNearbyEmergencies(res.data.data))
+         .catch(console.error);
+    };
+
+    // 🟢 WAKE UP FIX: If the phone was asleep and reconnects, fetch missing data
     socket.on("connect", () => {
       socket.emit("joinUserRoom", userId);
+      if (currentLocRef.current) {
+        fetchNearby(currentLocRef.current.lat, currentLocRef.current.lng);
+      }
     });
+    
     socket.emit("joinUserRoom", userId);
 
     socket.on("EMERGENCY_ACCEPTED_GLOBAL", (data) => {
@@ -71,13 +82,25 @@ export default function Home() {
         const distance = calculateDistanceKm(currentLocRef.current.lat, currentLocRef.current.lng, emLat, emLng);
         
         if (!isNaN(distance) && distance <= 5.0) {
-          toast.error(`New ${data.priority} Emergency nearby!`);
-          sendSystemNotification(
-            "🚨 Urgent: Emergency Nearby!", 
-            `${data.type} emergency reported ${distance.toFixed(1)} km away. Tap to view.`
-          );
-          setNearbyEmergencies((prev) => [data, ...prev]);
+          setNearbyEmergencies((prev) => {
+            // 🟢 DUPLICATE FIX: Prevent double UI cards
+            if (prev.some(em => (em._id === data._id || em.emergencyId === data._id))) return prev;
+            
+            toast.error(`New ${data.priority} Emergency nearby!`);
+            sendSystemNotification(
+              "🚨 Urgent: Emergency Nearby!", 
+              `${data.type} emergency reported ${distance.toFixed(1)} km away. Tap to view.`
+            );
+            return [data, ...prev];
+          });
         }
+      } else {
+        // 🟢 GPS LAG FIX: If the socket beats the mobile GPS, wait 3 seconds and fetch
+        setTimeout(() => {
+          if (currentLocRef.current) {
+            fetchNearby(currentLocRef.current.lat, currentLocRef.current.lng);
+          }
+        }, 3000);
       }
     });
 
@@ -110,9 +133,7 @@ export default function Home() {
 
         if (!fetchedInitialRef.current) {
           fetchedInitialRef.current = true;
-          api.get(`/emergencies/nearby?lat=${lat}&lng=${lng}`)
-             .then(res => setNearbyEmergencies(res.data.data))
-             .catch(console.error);
+          fetchNearby(lat, lng); // Uses the reusable function
         }
       },
       (error) => {
