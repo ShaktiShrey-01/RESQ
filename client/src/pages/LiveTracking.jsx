@@ -16,7 +16,10 @@ const calculateDistanceKm = (lat1, lon1, lat2, lon2) => {
   const R = 6371; 
   const dLat = (lat2 - lat1) * (Math.PI / 180);
   const dLon = (lon2 - lon1) * (Math.PI / 180);
-  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
   return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 };
 
@@ -35,8 +38,6 @@ export default function LiveTracking() {
   const watchIdRef = useRef(null);
   const chatEndRef = useRef(null);
   const distanceMilestones = useRef([2.0, 1.0, 0.5, 0.1]);
-  
-  // 🟢 ANTI-DUPLICATE SET (Fixes the double message bug)
   const processedMessages = useRef(new Set()); 
 
   const [emergency, setEmergency] = useState(null);
@@ -62,18 +63,44 @@ export default function LiveTracking() {
   }, [messages, isChatOpen]);
 
   useEffect(() => {
-    if ("Notification" in window && Notification.permission === "default") Notification.requestPermission();
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
   }, []);
 
+  // Fetch initial emergency details and establish socket room
   useEffect(() => {
+    let isMounted = true;
+
     const fetchEmergency = async () => {
       try {
         const response = await api.get(`/emergencies/${id}`);
-        setEmergency(response.data.data);
-        if (response.data.data.chat) setMessages(response.data.data.chat);
-      } catch (error) { console.error("Fetch Error:", error); } 
-      finally { setLoading(false); }
+        const data = response.data.data;
+        if (!isMounted) return;
+
+        setEmergency(data);
+        if (data.chat) setMessages(data.chat);
+
+        // Pre-fill helper coordinates if available
+        if (data.helperLocation?.coordinates) {
+          setHelperCoords({
+            lat: data.helperLocation.coordinates[1],
+            lng: data.helperLocation.coordinates[0]
+          });
+        } else if (data.helper?.location?.coordinates) {
+          setHelperCoords({
+            lat: data.helper.location.coordinates[1],
+            lng: data.helper.location.coordinates[0]
+          });
+        }
+      } catch (error) {
+        console.error("Fetch Emergency Error:", error);
+        toast.error("Unable to load emergency details.");
+      } finally {
+        if (isMounted) setLoading(false);
+      }
     };
+
     fetchEmergency();
 
     socketRef.current = io(import.meta.env.VITE_BACKEND_URL, { withCredentials: true });
@@ -83,14 +110,17 @@ export default function LiveTracking() {
       socket.emit("joinUserRoom", currentUserId);
       socket.emit("joinUserRoom", `user:${currentUserId}`);
     }
+    // Join emergency-specific room
+    socket.emit("joinEmergencyRoom", id);
 
     socket.on("HELPER_LOCATION_UPDATED", (data) => {
-      if (data.emergencyId === id) setHelperCoords({ lat: data.lat, lng: data.lng });
+      if (data.emergencyId === id) {
+        setHelperCoords({ lat: Number(data.lat), lng: Number(data.lng) });
+      }
     });
 
     const handleReceiveMessage = (data) => {
       if (data.emergencyId === id) {
-        // 🟢 FIX 1: Silently reject the message if we have already processed this exact timestamp!
         if (processedMessages.current.has(data.message.timestamp)) return;
         processedMessages.current.add(data.message.timestamp);
 
@@ -112,45 +142,77 @@ export default function LiveTracking() {
     socket.on("EMERGENCY_STATUS_UPDATED", (data) => {
       if (data.emergencyId === id) {
         if (data.status === 'SEARCHING') {
-          if (data.message) { toast.error(data.message, { duration: 5000, icon: '⚠️' }); sendSystemNotification("Responder Cancelled", data.message); }
-          navigate('/'); return;
+          if (data.message) {
+            toast.error(data.message, { duration: 5000, icon: '⚠️' });
+            sendSystemNotification("Responder Cancelled", data.message);
+          }
+          navigate('/');
+          return;
         }
-        if (data.status === 'CANCELED') { toast.error("This emergency has been cancelled."); navigate('/'); return; }
+        if (data.status === 'CANCELED') {
+          toast.error("This emergency has been cancelled.");
+          navigate('/');
+          return;
+        }
         
         setEmergency((prev) => ({ ...prev, status: data.status }));
-        if (data.status === 'ARRIVED') sendSystemNotification("📍 Responder Arrived!", "The helper has reached the destination.");
-        if (data.status === 'RESOLVED') { toast.success("Emergency Resolved!"); navigate('/'); }
+        if (data.status === 'ARRIVED') {
+          sendSystemNotification("📍 Responder Arrived!", "The helper has reached the destination.");
+        }
+        if (data.status === 'RESOLVED') {
+          toast.success("Emergency Resolved!");
+          navigate('/');
+        }
       }
     });
 
-    return () => { if (socket) socket.disconnect(); };
+    return () => {
+      isMounted = false;
+      if (socket) socket.disconnect();
+    };
   }, [id, currentUserId, navigate]);
 
+  // GPS tracking for the helper
   useEffect(() => {
     if (!emergency || !currentUserId) return;
-    const isHelper = emergency.helper && (emergency.helper._id === currentUserId);
+    const isHelper = emergency.helper && (emergency.helper._id === currentUserId || emergency.helper === currentUserId);
     const isActive = ['ASSIGNED', 'ON_THE_WAY', 'ARRIVED'].includes(emergency.status);
     
     if (isHelper && isActive) {
-      if (emergency.status === 'ASSIGNED') api.patch(`/emergencies/${id}/status`, { status: 'ON_THE_WAY' }).catch(console.error);
+      if (emergency.status === 'ASSIGNED') {
+        api.patch(`/emergencies/${id}/status`, { status: 'ON_THE_WAY' }).catch(console.error);
+      }
+      
       watchIdRef.current = navigator.geolocation.watchPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
           setHelperCoords({ lat: latitude, lng: longitude }); 
-          socketRef.current.emit("LOCATION_UPDATE", { userId: currentUserId, emergencyId: emergency._id, lat: latitude, lng: longitude });
+          if (socketRef.current) {
+            socketRef.current.emit("LOCATION_UPDATE", {
+              userId: currentUserId,
+              emergencyId: emergency._id,
+              lat: latitude,
+              lng: longitude
+            });
+          }
         },
-        (error) => console.error("Tracking error", error),
+        (error) => console.error("Tracking error:", error),
         { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 }
       );
     }
-    return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current); };
-  }, [emergency?.status, currentUserId, id]);
+    return () => {
+      if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
+    };
+  }, [emergency?.status, emergency?.helper, currentUserId, id]);
 
+  // Route and distance calculation (OSRM with direct distance fallback)
   useEffect(() => {
     if (helperCoords && emergency && ['ASSIGNED', 'ON_THE_WAY', 'ARRIVED'].includes(emergency.status)) {
       const emLng = emergency.location?.coordinates?.[0];
       const emLat = emergency.location?.coordinates?.[1];
       if (!emLng || !emLat) return;
+
+      const directKm = calculateDistanceKm(helperCoords.lat, helperCoords.lng, emLat, emLng);
 
       fetch(`https://router.project-osrm.org/route/v1/driving/${helperCoords.lng},${helperCoords.lat};${emLng},${emLat}?overview=full&geometries=geojson`)
         .then(res => res.json())
@@ -158,17 +220,23 @@ export default function LiveTracking() {
           if (data.routes && data.routes[0]) {
             setRouteLine(data.routes[0].geometry.coordinates.map(coord => [coord[1], coord[0]]));
             setLiveDistance(data.routes[0].distance); 
+          } else {
+            setLiveDistance(directKm * 1000);
           }
-        }).catch(err => console.error("Route fetch failed", err));
+        })
+        .catch(() => {
+          setLiveDistance(directKm * 1000);
+        });
     }
-  }, [helperCoords, emergency?.status]);
+  }, [helperCoords, emergency?.status, emergency?.location]);
 
   const emergencyLat = emergency?.location?.coordinates?.[1];
   const emergencyLng = emergency?.location?.coordinates?.[0];
-  const isRequester = emergency?.createdBy?._id === currentUserId;
+  const isRequester = emergency?.createdBy?._id === currentUserId || emergency?.createdBy === currentUserId;
 
+  // Milestone notifications for Requester
   useEffect(() => {
-    if (helperCoords && emergencyLat && isRequester && emergency.status === 'ON_THE_WAY') {
+    if (helperCoords && emergencyLat && isRequester && emergency?.status === 'ON_THE_WAY') {
       const currentDistanceKm = calculateDistanceKm(helperCoords.lat, helperCoords.lng, emergencyLat, emergencyLng);
       const nextMilestone = distanceMilestones.current[0];
       if (nextMilestone && currentDistanceKm <= nextMilestone) {
@@ -183,7 +251,11 @@ export default function LiveTracking() {
   const handleSendMessage = (e) => {
     e.preventDefault();
     if (!newMessage.trim()) return;
-    socketRef.current.emit("SEND_MESSAGE", { emergencyId: emergency._id, senderId: currentUserId, text: newMessage.trim() });
+    socketRef.current.emit("SEND_MESSAGE", {
+      emergencyId: emergency._id,
+      senderId: currentUserId,
+      text: newMessage.trim()
+    });
     setNewMessage(""); 
   };
 
@@ -191,8 +263,12 @@ export default function LiveTracking() {
     setIsResolving(true);
     try {
       await api.patch(`/emergencies/${id}/status`, { status: 'RESOLVED' });
-      toast.success("Mission accomplished!"); navigate('/');
-    } catch (error) { toast.error("Failed to resolve."); setIsResolving(false); }
+      toast.success("Mission accomplished!");
+      navigate('/');
+    } catch (error) {
+      toast.error("Failed to resolve.");
+      setIsResolving(false);
+    }
   };
 
   const handleDropMission = async () => {
@@ -200,8 +276,12 @@ export default function LiveTracking() {
     setIsDropping(true);
     try {
       await api.post(`/emergencies/${id}/drop`);
-      toast.success("Response cancelled."); navigate('/'); 
-    } catch (error) { toast.error("Failed to cancel."); setIsDropping(false); }
+      toast.success("Response cancelled.");
+      navigate('/'); 
+    } catch (error) {
+      toast.error("Failed to cancel.");
+      setIsDropping(false);
+    }
   };
 
   const handleCancelEmergency = async () => {
@@ -209,22 +289,33 @@ export default function LiveTracking() {
     setIsCanceling(true);
     try {
       await api.patch(`/emergencies/${id}/cancel`);
-      toast.success("Emergency cancelled."); navigate('/');
-    } catch (error) { toast.error("Failed to cancel."); setIsCanceling(false); }
+      toast.success("Emergency cancelled.");
+      navigate('/');
+    } catch (error) {
+      toast.error("Failed to cancel.");
+      setIsCanceling(false);
+    }
   };
 
-  if (loading && !emergency) return <div className="min-h-screen flex items-center justify-center"><Loader fullScreen /></div>;
+  if (loading && !emergency) {
+    return <div className="min-h-screen flex items-center justify-center"><Loader fullScreen /></div>;
+  }
   if (!emergency) return null;
 
-  const isHelper = emergency.helper?._id === currentUserId;
+  const isHelper = emergency.helper?._id === currentUserId || emergency.helper === currentUserId;
   const otherPerson = isRequester ? emergency.helper : emergency.createdBy;
 
   const estimatedMins = liveDistance ? Math.ceil(liveDistance / 333) : 0;
-  const formattedDistance = liveDistance ? (liveDistance < 1000 ? `${Math.round(liveDistance)} m` : `${(liveDistance/1000).toFixed(1)} km`) : 'Calculating...';
-  const directDistanceKm = helperCoords && emergencyLat ? calculateDistanceKm(helperCoords.lat, helperCoords.lng, emergencyLat, emergencyLng) : null;
+  const formattedDistance = liveDistance
+    ? (liveDistance < 1000 ? `${Math.round(liveDistance)} m` : `${(liveDistance / 1000).toFixed(1)} km`)
+    : 'Calculating...';
+  const directDistanceKm = helperCoords && emergencyLat
+    ? calculateDistanceKm(helperCoords.lat, helperCoords.lng, emergencyLat, emergencyLng)
+    : null;
   const isWithin100m = directDistanceKm !== null && directDistanceKm <= 0.1;
 
-  let narrativeTitle = ""; let narrativeSub = "";
+  let narrativeTitle = "";
+  let narrativeSub = "";
   if (emergency.status === "SEARCHING") { 
     narrativeTitle = "Searching for Responder"; 
     narrativeSub = "Alerting nearby users..."; 
@@ -241,33 +332,57 @@ export default function LiveTracking() {
   const displayAddress = emergency.location?.address !== 'GPS Location Acquired' ? emergency.location?.address : null;
 
   return (
-    <div className="w-full h-[100dvh] bg-slate-100 dark:bg-slate-950 flex flex-col relative overflow-hidden">
+    <div className="w-full h-[100dvh] bg-slate-100 dark:bg-slate-950 flex flex-col md:flex-row relative overflow-hidden">
       
       <ChatModal 
-        isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} messages={messages} 
-        currentUserId={currentUserId} otherPerson={otherPerson} newMessage={newMessage} 
-        setNewMessage={setNewMessage} onSendMessage={handleSendMessage} chatEndRef={chatEndRef}
-      />
-
-      <TrackingTopPanel 
-        narrativeTitle={narrativeTitle} narrativeSub={narrativeSub} 
-        unreadCount={unreadCount} isChatOpen={isChatOpen} 
-        onOpenChat={() => setIsChatOpen(true)} onBack={() => navigate('/')} 
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        messages={messages} 
+        currentUserId={currentUserId}
         otherPerson={otherPerson}
+        newMessage={newMessage} 
+        setNewMessage={setNewMessage}
+        onSendMessage={handleSendMessage}
+        chatEndRef={chatEndRef}
       />
 
-      <TrackingMap 
-        emergencyLat={emergencyLat} emergencyLng={emergencyLng} 
-        helperCoords={helperCoords} routeLine={routeLine} status={emergency.status} 
-      />
+      {/* Desktop Sidebar / Mobile Stack Wrapper */}
+      <div className="flex flex-col md:w-[420px] lg:w-[460px] md:h-full md:border-r border-slate-200 dark:border-slate-800 z-20 bg-white dark:bg-slate-900 justify-between shrink-0 shadow-xl overflow-y-auto">
+        <TrackingTopPanel 
+          narrativeTitle={narrativeTitle}
+          narrativeSub={narrativeSub} 
+          unreadCount={unreadCount}
+          onOpenChat={() => setIsChatOpen(true)}
+          onBack={() => navigate('/')} 
+        />
 
-      <TrackingBottomPanel 
-        isRequester={isRequester} isHelper={isHelper} otherPerson={otherPerson} 
-        emergency={emergency} isWithin100m={isWithin100m} isResolving={isResolving} 
-        isDropping={isDropping} isCanceling={isCanceling} displayAddress={displayAddress} 
-        onResolve={handleResolveEmergency} onDrop={handleDropMission} 
-        onCancel={handleCancelEmergency} onOpenChat={() => setIsChatOpen(true)} 
-      />
+        <TrackingBottomPanel 
+          isRequester={isRequester}
+          isHelper={isHelper}
+          otherPerson={otherPerson} 
+          emergency={emergency}
+          isWithin100m={isWithin100m}
+          isResolving={isResolving} 
+          isDropping={isDropping}
+          isCanceling={isCanceling}
+          displayAddress={displayAddress} 
+          onResolve={handleResolveEmergency}
+          onDrop={handleDropMission} 
+          onCancel={handleCancelEmergency}
+          onOpenChat={() => setIsChatOpen(true)} 
+        />
+      </div>
+
+      {/* Map Expands Across Full Height on Desktop */}
+      <div className="flex-1 h-full w-full relative z-0">
+        <TrackingMap 
+          emergencyLat={emergencyLat}
+          emergencyLng={emergencyLng} 
+          helperCoords={helperCoords}
+          routeLine={routeLine}
+          status={emergency.status} 
+        />
+      </div>
     </div>
   );
 }
