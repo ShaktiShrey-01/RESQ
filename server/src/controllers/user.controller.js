@@ -4,6 +4,7 @@ import redis from "../config/redis.js";
 import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";
 import {uploadfile} from "../utils/imagekit.js"; // Import multer configuration
+ // Import default image buffer
 // Create a nodemailer transporter
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -93,7 +94,8 @@ export async function createuser(req, res) {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
    // 🟢 UPDATED: Handle optional image buffer from Multer memory storage
-    let avatarUrl = "https://res.cloudinary.com/dxjzq6f0g/image/upload/v1690912345/avatars/default-avatar.png";
+   const defaultAvatar = `${req.protocol}://${req.get('host')}/default.jpg`;
+    let avatarUrl = defaultAvatar; // Default avatar if no image is provided
     if (req.file) {
       const base64Image = req.file.buffer.toString('base64');
       avatarUrl = await uploadfile(base64Image); // Uses ImageKit

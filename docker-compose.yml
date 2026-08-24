@@ -1,0 +1,52 @@
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: resq_mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  redis:
+    image: redis:latest
+    container_name: resq_redis
+    ports:
+      - "6379:6379"
+
+  server:
+    build: ./server
+    container_name: resq_backend
+    ports:
+      - "8000:8000"
+    # 🟢 This pulls your REAL keys from your .env file
+    env_file:
+      - ./server/.env
+    environment:
+      # 🟢 Only Docker-specific network variables go here now!
+      - PORT=8000
+      - MONGO_URI=mongodb://mongodb:27017/resq 
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - mongodb
+      - redis
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+
+  client:
+    build: ./client
+    container_name: resq_frontend
+    ports:
+      - "5173:5173"
+    env_file:
+      - ./client/.env
+    environment:
+      - VITE_BACKEND_URL=http://localhost:8000 
+    depends_on:
+      - server
+    volumes:
+      - ./client:/app
+      - /app/node_modules
+
+volumes:
+  mongo_data:
