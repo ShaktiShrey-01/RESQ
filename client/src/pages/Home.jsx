@@ -58,17 +58,29 @@ export default function Home() {
 
     socket.on("connect", () => {
       socket.emit("joinUserRoom", userId);
-      if (currentLocRef.current) {
-        fetchNearby(currentLocRef.current.lat, currentLocRef.current.lng);
-      }
+      if (currentLocRef.current) fetchNearby(currentLocRef.current.lat, currentLocRef.current.lng);
     });
     
     socket.emit("joinUserRoom", userId);
 
+    // 🟢 CRITICAL FIX: Centralized Navigation to prevent double toasts
+    const handleAcceptedNavigation = (emergencyId) => {
+      // The { id } property forces React to only show this toast once, even if called 3 times!
+      toast.success("A responder is on the way!", { id: `otw-toast-${emergencyId}` });
+      navigate(`/tracking/${emergencyId}`);
+    };
+
     socket.on("EMERGENCY_ACCEPTED_GLOBAL", (data) => {
-      if (String(data.creatorId) === userId) {
-        toast.success("A responder is on the way!");
-        navigate(`/tracking/${data.emergencyId}`);
+      if (String(data.creatorId) === userId) handleAcceptedNavigation(data.emergencyId);
+    });
+
+    socket.on("EMERGENCY_ACCEPTED", (data) => {
+      handleAcceptedNavigation(data.emergencyId || data._id);
+    });
+
+    socket.on("EMERGENCY_STATUS_UPDATED", (data) => {
+      if (data.status === 'ASSIGNED' || data.status === 'ON_THE_WAY') {
+        handleAcceptedNavigation(data.emergencyId);
       }
     });
 
@@ -81,33 +93,36 @@ export default function Home() {
         const distance = calculateDistanceKm(currentLocRef.current.lat, currentLocRef.current.lng, emLat, emLng);
         
         if (!isNaN(distance) && distance <= 5.0) {
-          toast.error(`New ${data.priority} Emergency nearby!`);
-          sendSystemNotification(
-            "🚨 Urgent: Emergency Nearby!", 
-            `${data.type} emergency reported ${distance.toFixed(1)} km away. Tap to view.`
-          );
-          
-          // 🟢 CRASH FIX: Do NOT push raw socket data into state. 
-          // Fetch from API instead so it has the perfectly populated database structure.
-          fetchNearby(currentLocRef.current.lat, currentLocRef.current.lng);
+          setNearbyEmergencies((prev) => {
+            if (prev.some(em => String(em._id) === String(data.emergencyId))) return prev;
+            
+            toast.error(`New ${data.priority} Emergency nearby!`, { id: `new-em-${data.emergencyId}` });
+            sendSystemNotification("🚨 Urgent: Emergency Nearby!", `${data.type} emergency reported ${distance.toFixed(1)} km away. Tap to view.`);
+            
+            // 🟢 CRITICAL FIX: Manually build the exact JSON structure React expects
+            // This injects it directly into the UI without waiting for a slow API call
+            const instantEmergencyCard = {
+              _id: data.emergencyId,
+              type: data.type,
+              description: data.description,
+              location: data.location,
+              address: data.address,
+              priority: data.priority,
+              status: data.status,
+              createdAt: new Date().toISOString(),
+              createdBy: {
+                _id: data.creatorId,
+                name: data.creatorName
+              }
+            };
+            
+            return [instantEmergencyCard, ...prev];
+          });
         }
       } else {
         setTimeout(() => {
           if (currentLocRef.current) fetchNearby(currentLocRef.current.lat, currentLocRef.current.lng);
         }, 3000);
-      }
-    });
-
-    socket.on("EMERGENCY_ACCEPTED", (data) => {
-      toast.success("A responder is on the way!");
-      const id = data.emergencyId || data._id;
-      navigate(`/tracking/${id}`); 
-    });
-
-    socket.on("EMERGENCY_STATUS_UPDATED", (data) => {
-      if (data.status === 'ASSIGNED' || data.status === 'ON_THE_WAY') {
-        toast.success("A responder is on the way!");
-        navigate(`/tracking/${data.emergencyId}`);
       }
     });
 
@@ -134,10 +149,8 @@ export default function Home() {
       (position) => {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
-        
         currentLocRef.current = { lat, lng };
         setIsTracking(true);
-        
         socket.emit("LOCATION_UPDATE", { userId, lat, lng, emergencyId: null });
 
         if (!fetchedInitialRef.current) {

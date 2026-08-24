@@ -91,13 +91,25 @@ export default function LiveTracking() {
 
     socket.on("EMERGENCY_CANCELLED", (data) => {
       if (String(data.emergencyId) === String(id)) {
-        toast.error("This emergency has been closed."); navigate('/');
+        toast.error("This emergency has been closed.", { id: 'status-closed' }); 
+        navigate('/');
       }
     });
 
     socket.on("EMERGENCY_STATUS_UPDATED", (data) => {
       if (String(data.emergencyId) === String(id)) {
-        if (['SEARCHING', 'CANCELED', 'RESOLVED'].includes(data.status)) { navigate('/'); return; }
+        if (data.status === 'SEARCHING') {
+          navigate('/'); return;
+        }
+        if (data.status === 'CANCELED') {
+          toast.error("Emergency was cancelled.", { id: 'status-closed' });
+          navigate('/'); return;
+        }
+        // 🟢 NEW: Display Proper Resolve Toast on Socket Update
+        if (data.status === 'RESOLVED') {
+          toast.success("Emergency Resolved Successfully! 🎉", { id: 'status-resolved' });
+          navigate('/'); return;
+        }
         setEmergency((prev) => ({ ...prev, status: data.status }));
       }
     });
@@ -180,7 +192,7 @@ export default function LiveTracking() {
     narrativeTitle = "Arrived at Destination"; narrativeSub = "Location reached safely.";
   }
 
-  // 🟢 NEW LAYOUT: Scrollable Flex-Col, Transparent, Stacked for ALL devices
+  // 🟢 NEW LAYOUT: Scrollable Flex-Col, Transparent, Stacked vertically for ALL devices
   return (
     <div className="w-full min-h-[100dvh] bg-transparent flex flex-col relative overflow-y-auto overflow-x-hidden">
       
@@ -191,14 +203,38 @@ export default function LiveTracking() {
         <TrackingTopPanel narrativeTitle={narrativeTitle} narrativeSub={narrativeSub} onBack={() => navigate('/')} />
       </div>
 
-      {/* 2. MAP (Fixed height so user can scroll past it) */}
+      {/* 2. MAP (Fixed height so user can scroll past it on PC and Mobile) */}
       <div className="w-full h-[50vh] min-h-[400px] z-10 max-w-4xl mx-auto rounded-none md:rounded-3xl overflow-hidden border-0 md:border border-neutral-200 dark:border-neutral-800 shadow-none md:shadow-lg">
         <TrackingMap emergencyLat={emergencyLat} emergencyLng={emergencyLng} helperCoords={helperCoords} routeLine={routeLine} status={emergency.status} />
       </div>
 
       {/* 3. BOTTOM PANEL (Transparent) */}
       <div className="w-full z-20 flex-1 pb-10 max-w-4xl mx-auto">
-        <TrackingBottomPanel isRequester={isRequester} isHelper={isHelper} otherPerson={otherPerson} emergency={emergency} isWithin100m={isWithin100m} isResolving={isResolving} isDropping={isDropping} isCanceling={isCanceling} displayAddress={emergency.location?.address} onResolve={() => { setIsResolving(true); api.patch(`/emergencies/${id}/status`, { status: 'RESOLVED' }).then(() => navigate('/')).catch(() => { toast.error("Failed"); setIsResolving(false); }); }} onDrop={() => { if(window.confirm("Cancel response?")) { setIsDropping(true); api.post(`/emergencies/${id}/drop`).then(() => navigate('/')).catch(() => { toast.error("Failed"); setIsDropping(false); }); } }} onCancel={() => { if(window.confirm("Cancel emergency?")) { setIsCanceling(true); api.patch(`/emergencies/${id}/cancel`).then(() => navigate('/')).catch(() => { toast.error("Failed"); setIsCanceling(false); }); } }} onOpenChat={() => setIsChatOpen(true)} />
+        <TrackingBottomPanel 
+          isRequester={isRequester} 
+          isHelper={isHelper} 
+          otherPerson={otherPerson} 
+          emergency={emergency} 
+          isWithin100m={isWithin100m} 
+          isResolving={isResolving} 
+          isDropping={isDropping} 
+          isCanceling={isCanceling} 
+          displayAddress={emergency.location?.address} 
+          
+          // 🟢 NEW: Success Toast specifically triggered upon clicking Resolve
+          onResolve={() => { 
+            setIsResolving(true); 
+            api.patch(`/emergencies/${id}/status`, { status: 'RESOLVED' })
+              .then(() => {
+                toast.success("Mission Accomplished! 🎉", { id: 'status-resolved' });
+                navigate('/');
+              })
+              .catch(() => { toast.error("Failed to resolve."); setIsResolving(false); }); 
+          }} 
+          onDrop={() => { if(window.confirm("Cancel response?")) { setIsDropping(true); api.post(`/emergencies/${id}/drop`).then(() => navigate('/')).catch(() => { toast.error("Failed"); setIsDropping(false); }); } }} 
+          onCancel={() => { if(window.confirm("Cancel emergency?")) { setIsCanceling(true); api.patch(`/emergencies/${id}/cancel`).then(() => navigate('/')).catch(() => { toast.error("Failed"); setIsCanceling(false); }); } }} 
+          onOpenChat={() => setIsChatOpen(true)} 
+        />
       </div>
 
     </div>
