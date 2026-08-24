@@ -107,19 +107,23 @@ To stop the containers, run:
 docker-compose down
 
 📱 How to Use
-Sign Up / Login: Create an account. An OTP will be sent to your email for verification.
-Allow Location: When prompted, allow the browser to access your GPS location.
-Request Help: Click the "Create Emergency" button, select the emergency type, and broadcast your location.
-Respond to Emergencies: If you are within 5km of an active emergency, it will appear on your radar. Click "Accept" to become the responder.
+<br/>
+Sign Up / Login: Create an account. An OTP will be sent to your email for verification.<br/>
+Allow Location: When prompted, allow the browser to access your GPS location.<br/>
+Request Help: Click the "Create Emergency" button, select the emergency type, and broadcast your location.<br/>
+Respond to Emergencies: If you are within 5km of an active emergency, it will appear on your radar. Click "Accept" to become the <br/>responder.
+<br/>
 Live Tracking: Once matched, both users are taken to a live map showing real-time location updates, estimated arrival times, and a live chat interface to coordinate the rescue.
 <br/>
+<br/>
 🌍 Deployment
-Frontend: Deployed on Netlify
-Backend: Deployed on Render with configured IPv4 DNS flags to allow Nodemailer SMTP connections.
-Database: Hosted on MongoDB Atlas
-Caching: Hosted on Redis Cloud
-👨‍💻 Author
-Developed by Shakti Shrey
-⭐ Support
-If you like this project, please consider giving it a ⭐ on GitHub!
-RESQ — Help is closer than you think.
+<br/>
+Frontend: Deployed on Netlify<br/>
+Backend: Deployed on Render with configured IPv4 DNS flags to allow Nodemailer SMTP connections.<br/>
+Database: Hosted on MongoDB Atlas<br/>
+Caching: Hosted on Redis Cloud<br/>
+👨‍💻 Author<br/>
+Developed by Shakti Shrey<br/>
+⭐ Support<br/>
+If you like this project, please consider giving it a ⭐ on GitHub!<br/>
+RESQ — Help is closer than you think.<br/>
