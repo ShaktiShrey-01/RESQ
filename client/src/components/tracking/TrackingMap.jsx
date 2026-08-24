@@ -20,18 +20,22 @@ function MapUpdater({ emergencyCoords, helperCoords }) {
   const map = useMap();
 
   useEffect(() => {
-    // Invalidate size on mount & viewport change
-    map.invalidateSize();
+    // 🟢 CRITICAL MOBILE FIX: Wait 300ms for mobile CSS grids to settle before drawing the map
+    const timeoutId = setTimeout(() => {
+      map.invalidateSize();
+      
+      if (helperCoords && emergencyCoords && helperCoords.lat && emergencyCoords.lat) {
+        const bounds = L.latLngBounds([
+          [emergencyCoords.lat, emergencyCoords.lng],
+          [helperCoords.lat, helperCoords.lng]
+        ]);
+        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
+      } else if (emergencyCoords && emergencyCoords.lat) {
+        map.setView([emergencyCoords.lat, emergencyCoords.lng], 15);
+      }
+    }, 300);
 
-    if (helperCoords && emergencyCoords && helperCoords.lat && emergencyCoords.lat) {
-      const bounds = L.latLngBounds([
-        [emergencyCoords.lat, emergencyCoords.lng],
-        [helperCoords.lat, helperCoords.lng]
-      ]);
-      map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
-    } else if (emergencyCoords && emergencyCoords.lat) {
-      map.setView([emergencyCoords.lat, emergencyCoords.lng], 15);
-    }
+    return () => clearTimeout(timeoutId);
   }, [helperCoords, emergencyCoords, map]);
 
   return null;
@@ -41,11 +45,13 @@ export default function TrackingMap({ emergencyLat, emergencyLng, helperCoords, 
   if (!emergencyLat || !emergencyLng) return null;
 
   return (
-    <div className="w-full h-full min-h-[350px] md:min-h-full relative z-0">
+    // 🟢 CRITICAL MOBILE FIX: Force min-height and strict styling so grid doesn't crush the map
+    <div className="w-full h-full min-h-[45vh] md:min-h-full relative z-0 flex flex-col flex-1">
       <MapContainer
         center={[emergencyLat, emergencyLng]}
         zoom={15}
-        className="w-full h-full"
+        className="w-full h-full flex-1"
+        style={{ height: '100%', width: '100%' }} // Forces Leaflet to take up the div
         zoomControl={true}
       >
         <TileLayer

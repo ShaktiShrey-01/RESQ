@@ -114,19 +114,32 @@ export default function LiveTracking() {
   }, [id, currentUserId, navigate, isChatOpen]);
 
   // GPS tracking for helper
+ // GPS tracking for helper
   useEffect(() => {
     if (!emergency || !currentUserId) return;
     const isHelper = emergency.helper?._id === currentUserId || emergency.helper === currentUserId;
     
     if (isHelper && ['ASSIGNED', 'ON_THE_WAY', 'ARRIVED'].includes(emergency.status)) {
+      
+      // Helper function to send location to socket instantly
+      const broadcastLocation = (lat, lng) => {
+        setHelperCoords({ lat, lng }); 
+        if (socketRef.current) {
+          socketRef.current.emit("LOCATION_UPDATE", { userId: currentUserId, emergencyId: id, lat, lng });
+        }
+      };
+
+      // 🟢 FIX 1: THE INSTANT BLASTER
+      // PCs often stall on watchPosition. This forces an immediate location send to the requester.
+      navigator.geolocation.getCurrentPosition(
+        (pos) => broadcastLocation(pos.coords.latitude, pos.coords.longitude),
+        (err) => console.log("Initial quick-fetch waiting for watcher..."),
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      );
+
+      // 🟢 CONTINUOUS WATCHER
       watchIdRef.current = navigator.geolocation.watchPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          setHelperCoords({ lat: latitude, lng: longitude }); 
-          if (socketRef.current) {
-            socketRef.current.emit("LOCATION_UPDATE", { userId: currentUserId, emergencyId: id, lat: latitude, lng: longitude });
-          }
-        },
+        (position) => broadcastLocation(position.coords.latitude, position.coords.longitude),
         (error) => console.error("Tracking error:", error),
         { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 }
       );
