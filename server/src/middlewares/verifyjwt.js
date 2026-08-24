@@ -1,4 +1,5 @@
-import jwt from "jsonwebtoken";
+
+import jwt from 'jsonwebtoken';
 //used for protecting route which means giving access to a particular route only if the user is logged in and has a valid token
 export async function verifyJWT(req, res, next) {
     const token = req.headers["authorization"]?.split(" ")[1];

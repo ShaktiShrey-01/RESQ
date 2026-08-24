@@ -1,5 +1,5 @@
 import User from "../models/user.model.js";
-import jwt from "jsonwebtoken";
+import jwt from 'jsonwebtoken';
 import redis from "../config/redis.js";
 import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";

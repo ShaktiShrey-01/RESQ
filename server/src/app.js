@@ -16,8 +16,10 @@ app.use(cors({
 
 // 2. Body & Cookie Parsers
 app.use(cookieParser());
+app.set('trust proxy', 1);
 app.use(express.json());
 app.use(express.static('public'));
+
 
 // 3. Routes
 // NOTE: Your routes start with /api/users
