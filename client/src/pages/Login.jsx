@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useDispatch } from 'react-redux';
 import { setCredentials } from '../store/authSlice';
-import resqLogo from '../assets/resq.png'; // Adjust relative path based on where your component file is
+import resqLogo from '/resq.png'; // Adjust relative path based on where your component file is
 export default function Login() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();

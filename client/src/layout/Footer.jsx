@@ -1,5 +1,5 @@
 import { Siren, Phone, MapPin } from 'lucide-react';
-import resqLogo from '../assets/resq.png'; 
+import resqLogo from '/resq.png'; 
 export default function Footer() {
   return (
     <footer className="relative z-10 w-full flex justify-center px-1 pb-3 sm:px-4 mt-auto">

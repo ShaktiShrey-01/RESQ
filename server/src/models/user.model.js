@@ -3,7 +3,7 @@ const userschema=mongoose.Schema({
     name:{type:String,required:true},
     email:{type:String,required:true,unique:true},
     password:{type:String,required:true},
-    role:{type:String,enum:["user","helper"],default:"user"},
+    avatar:{type:String,default:"https://res.cloudinary.com/dxjzq6f0g/image/upload/v1690912345/avatars/default-avatar.png"},
   location: {
       type: {
         type: String,

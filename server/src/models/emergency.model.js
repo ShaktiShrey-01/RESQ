@@ -46,6 +46,13 @@ const emergencySchema = new mongoose.Schema(
         enum: ['SEARCHING', 'ASSIGNED', 'ON_THE_WAY', 'ARRIVED', 'RESOLVED', 'CLOSED', 'CANCELED'],
         default: 'SEARCHING'
     },
+    chat: [
+      {
+        senderId: { type: String, required: true },
+        text: { type: String, required: true },
+        timestamp: { type: Date, default: Date.now }
+      }
+    ],
     acceptedAt: { type: Date, default: null },
     arrivedAt: { type: Date, default: null },
     resolvedAt: { type: Date, default: null },

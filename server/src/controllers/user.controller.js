@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import redis from "../config/redis.js";
 import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";
-
+import {uploadfile} from "../utils/imagekit.js"; // Import multer configuration
 // Create a nodemailer transporter
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -61,7 +61,6 @@ export async function sendSignupOTP(req, res) {
 export async function createuser(req, res) {
   try {
     const { email, otp, name, password } = req.body;
-
     if (!email || !otp || !name || !password) {
       return res.status(400).json({ 
         success: false, 
@@ -93,18 +92,24 @@ export async function createuser(req, res) {
     // 3. Hash the password before saving (Best Practice)
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
+   // 🟢 UPDATED: Handle optional image buffer from Multer memory storage
+    let avatarUrl = "https://res.cloudinary.com/dxjzq6f0g/image/upload/v1690912345/avatars/default-avatar.png";
+    if (req.file) {
+      const base64Image = req.file.buffer.toString('base64');
+      avatarUrl = await uploadfile(base64Image); // Uses ImageKit
+    }
 
-    // 4. Create the User
+    // 4. Create the User (Removed role)
     const user = await User.create({ 
       name, 
       email, 
       password: hashedPassword, 
-      role: "user" 
+      avatar: avatarUrl 
     });
 
     // 5. Generate JWTs for automatic login after signup
     const refreshToken = jwt.sign(
-      { id: user._id, role: user.role },
+      { id: user._id },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
@@ -119,7 +124,7 @@ export async function createuser(req, res) {
     });
 
     const accessToken = jwt.sign(
-      { id: user._id, role: user.role },
+      { id: user._id},
       process.env.JWT_SECRET,
       { expiresIn: "15m" }
     );
@@ -168,7 +173,7 @@ export async function login(req, res) {
     }
 
     const refreshtoken = jwt.sign(
-      { id: user._id, role: user.role },
+      { id: user._id },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
@@ -190,7 +195,7 @@ export async function login(req, res) {
     });
 
     const accessToken = jwt.sign(
-      { id: user._id, role: user.role },
+      { id: user._id },
       process.env.JWT_SECRET,
       { expiresIn: "15m" }
     );
@@ -235,7 +240,7 @@ export async function refreshtoken(req, res) {
     }
 
     const newrefreshtoken = jwt.sign(
-      { id: decoded.id, role: decoded.role },
+      { id: decoded.id },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
@@ -255,7 +260,7 @@ export async function refreshtoken(req, res) {
     });
 
     const accessToken = jwt.sign(
-      { id: decoded.id, role: decoded.role },
+      { id: decoded.id },
       process.env.JWT_SECRET,
       { expiresIn: "15m" }
     );

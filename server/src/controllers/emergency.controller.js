@@ -132,102 +132,52 @@ function normalizeEnum(value, allowedValues, fallback) {
 
 
 
+// ======================================
+// ACCEPT EMERGENCY
+// ======================================
 export async function acceptEmergency(req, res) {
-   // route: POST /api/emergencies/:emergencyId/accept
-try {
-  const { emergencyId } = req.params;
+  try {
+    const { emergencyId } = req.params;
+    const emergencyToAccept = await emergency.findOneAndUpdate(
+      { _id: emergencyId, status: "SEARCHING", helper: null },
+      { $set: { helper: req.user.id, status: "ASSIGNED", acceptedAt: new Date() } },
+      { new: true }
+    );
 
-  const emergencyToAccept = await emergency.findOneAndUpdate(
-    {
-      _id: emergencyId,
-      status: "SEARCHING",
-      helper: null,
-    },
-    {
-      $set: {
-        helper: req.user.id,
-        status: "ASSIGNED",
-        acceptedAt: new Date(),
-      },
-    },
-    {
-      new: true,
+    if (!emergencyToAccept) {
+      return res.status(400).json({ success: false, message: "Emergency not found or already accepted" });
     }
-  );
 
-  if (!emergencyToAccept) {
-    return res.status(400).json({
-      success: false,
-      message: "Emergency not found or already accepted",
-    });
-  }
-
-
-const helperId = req.user.id;
-    const io =
-      req.app.get("io");
-
+    const helperId = req.user.id;
+    const io = req.app.get("io");
 
     if (io) {
+      // 🟢 FOOLPROOF ID EXTRACTION
+      const creatorStr = emergencyToAccept.createdBy._id ? emergencyToAccept.createdBy._id.toString() : emergencyToAccept.createdBy.toString();
+      const helperStr = helperId.toString();
 
-      // Notify requester
-      io.to(
-        `user:${emergencyToAccept.createdBy}`
-      )
-      .emit(
-        "EMERGENCY_ACCEPTED",
-        {
+      const payload = {
+        emergencyId: emergencyToAccept._id, 
+        creatorId: creatorStr,
+        helperId: helperStr, 
+        status: "ASSIGNED"
+      };
 
-          emergencyId:
-            emergencyToAccept._id,
-
-          helperId:
-            helperId,
-
-          status:
-            "ASSIGNED"
-
-        }
-      );
-
-
-      // Notify helper too
-      io.to(
-        `user:${helperId}`
-      )
-      .emit(
-        "EMERGENCY_ACCEPTED",
-        {
-
-          emergencyId:
-            emergencyToAccept._id,
-
-          helperId:
-            helperId,
-
-          status:
-            "ASSIGNED"
-
-        }
-      );
-
+      // 1. Try emitting to private rooms first
+      io.to(`user:${creatorStr}`).emit("EMERGENCY_ACCEPTED", payload);
+      io.to(`user:${helperStr}`).emit("EMERGENCY_ACCEPTED", payload);
+      
+      // 2. 🟢 GLOBAL FALLBACK: Broadcast globally just in case their socket temporarily dropped the room
+      io.emit("EMERGENCY_ACCEPTED_GLOBAL", payload);
     }
 
-  return res.status(200).json({
-    success: true,
-    message: "Emergency accepted successfully",
-    data: emergencyToAccept,
-  });
-} catch (error) {
-  console.error("Accept emergency error:", error);
+    return res.status(200).json({ success: true, message: "Emergency accepted successfully", data: emergencyToAccept });
+  } catch (error) {
+    console.error("Accept emergency error:", error);
+    return res.status(500).json({ success: false, message: "Something went wrong while accepting", error: error.message });
+  }
+}
 
-  return res.status(500).json({
-    success: false,
-    message: "Something went wrong while accepting the emergency",
-    error: error.message,
-  });
-}
-}
 
 export async function getemergency(req,res){
     const{id}=req.params;
@@ -262,70 +212,7 @@ export async function getemergency(req,res){
 // ======================================
 // UPDATE EMERGENCY STATUS
 // ======================================
-export async function updateEmergencyStatus(req, res) {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
 
-    const allowedStatuses = ["ON_THE_WAY", "ARRIVED", "RESOLVED"];
-    if (!allowedStatuses.includes(status)) {
-      return res.status(400).json({ success: false, message: "Invalid status" });
-    }
-
-    const emergencyaccepted = await emergency.findById(id);
-    if (!emergencyaccepted) {
-      return res.status(404).json({ success: false, message: "Emergency not found" });
-    }
-
-    if (!emergencyaccepted.helper || emergencyaccepted.helper.toString() !== req.user.id.toString()) {
-      return res.status(403).json({ success: false, message: "You are not the assigned helper" });
-    }
-
-    // 🟢 THE FIX: We removed the strict blocking logic here. 
-    // Now, if they click "Reached Location" it can instantly jump to RESOLVED.
-    if (status === "ON_THE_WAY" && emergencyaccepted.status !== "ASSIGNED") {
-      return res.status(400).json({ success: false, message: "Emergency must be ASSIGNED first" });
-    }
-
-    emergencyaccepted.status = status;
-
-    if (status === "ARRIVED" || status === "RESOLVED") {
-      emergencyaccepted.arrivedAt = emergencyaccepted.arrivedAt || new Date();
-    }
-    if (status === "RESOLVED") {
-      emergencyaccepted.resolvedAt = new Date();
-    }
-
-    await emergencyaccepted.save();
-
-    const io = req.app.get("io");
-    if (io) {
-      io.to(`user:${emergencyaccepted.createdBy}`).emit("EMERGENCY_STATUS_UPDATED", {
-        emergencyId: emergencyaccepted._id,
-        status: emergencyaccepted.status,
-      });
-
-      if (emergencyaccepted.helper) {
-        io.to(`user:${emergencyaccepted.helper}`).emit("EMERGENCY_STATUS_UPDATED", {
-          emergencyId: emergencyaccepted._id,
-          status: emergencyaccepted.status,
-        });
-      }
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: "Emergency status updated",
-      emergency: emergencyaccepted,
-    });
-  } catch (error) {
-    console.error("Status update error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to update emergency status",
-    });
-  }
-}
 
 // ======================================
 // GET NEARBY (ACTIVE) EMERGENCIES
@@ -435,45 +322,7 @@ export async function getNearbyEmergencies(req, res) {
 // ======================================
 // CANCEL EMERGENCY
 // ======================================
-export async function cancelEmergency(req, res) {
-  try {
-    const { id } = req.params;
-    const emergencyToCancel = await emergency.findById(id);
 
-    if (!emergencyToCancel) return res.status(404).json({ success: false, message: "Emergency not found" });
-
-    if (emergencyToCancel.createdBy.toString() !== req.user.id.toString()) {
-      return res.status(403).json({ success: false, message: "Only the creator can cancel this emergency" });
-    }
-
-    if (["RESOLVED", "CLOSED", "CANCELED"].includes(emergencyToCancel.status)) {
-      return res.status(400).json({ success: false, message: "This emergency is already closed" });
-    }
-
-    emergencyToCancel.status = "CANCELED";
-    emergencyToCancel.resolvedAt = new Date();
-    await emergencyToCancel.save();
-
-    const io = req.app.get("io");
-    if (io) {
-      if (emergencyToCancel.helper) {
-        io.to(`user:${emergencyToCancel.helper}`).emit("EMERGENCY_STATUS_UPDATED", {
-          emergencyId: emergencyToCancel._id,
-          status: "CANCELED",
-          message: "The requester has cancelled this emergency.",
-        });
-      }
-      
-      // 🟢 FIX 2: Broadcast to EVERYONE to instantly erase it from their nearby radars
-      io.emit("EMERGENCY_CANCELLED", { emergencyId: emergencyToCancel._id });
-    }
-
-    return res.status(200).json({ success: true, message: "Emergency cancelled successfully" });
-  } catch (error) {
-    console.error("Cancel emergency error:", error);
-    return res.status(500).json({ success: false, message: "Failed to cancel emergency" });
-  }
-}
 
 // ==========================================
 // GET USER EMERGENCY HISTORY
@@ -509,70 +358,131 @@ export async function getUserHistory(req, res) {
 // ==========================================
 // HELPER CANCEL / DROP MISSION
 // ==========================================
+// ======================================
+// UPDATE EMERGENCY STATUS
+// ======================================
+export async function updateEmergencyStatus(req, res) {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const allowedStatuses = ["ON_THE_WAY", "ARRIVED", "RESOLVED"];
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({ success: false, message: "Invalid status" });
+    }
+
+    const emergencyaccepted = await emergency.findById(id);
+    if (!emergencyaccepted) return res.status(404).json({ success: false, message: "Emergency not found" });
+
+    if (!emergencyaccepted.helper || emergencyaccepted.helper.toString() !== req.user.id.toString()) {
+      return res.status(403).json({ success: false, message: "You are not the assigned helper" });
+    }
+
+    // 🟢 FIX 1: Ignore React double-fetching. If already ON_THE_WAY, just return success!
+    if (status === "ON_THE_WAY" && emergencyaccepted.status === "ON_THE_WAY") {
+      return res.status(200).json({ success: true, message: "Already on the way" });
+    }
+    if (status === "ON_THE_WAY" && emergencyaccepted.status !== "ASSIGNED") {
+      return res.status(400).json({ success: false, message: "Emergency must be ASSIGNED first" });
+    }
+
+    emergencyaccepted.status = status;
+    if (status === "ARRIVED" || status === "RESOLVED") emergencyaccepted.arrivedAt = emergencyaccepted.arrivedAt || new Date();
+    if (status === "RESOLVED") emergencyaccepted.resolvedAt = new Date();
+
+    await emergencyaccepted.save();
+
+    const io = req.app.get("io");
+    if (io) {
+      const creatorStr = emergencyaccepted.createdBy.toString();
+      const helperStr = emergencyaccepted.helper.toString();
+
+      io.to(`user:${creatorStr}`).emit("EMERGENCY_STATUS_UPDATED", { emergencyId: emergencyaccepted._id, status: emergencyaccepted.status });
+      io.to(`user:${helperStr}`).emit("EMERGENCY_STATUS_UPDATED", { emergencyId: emergencyaccepted._id, status: emergencyaccepted.status });
+    }
+
+    return res.status(200).json({ success: true, message: "Emergency status updated", emergency: emergencyaccepted });
+  } catch (error) {
+    console.error("Status update error:", error);
+    return res.status(500).json({ success: false, message: "Failed to update emergency status" });
+  }
+}
+
+// ======================================
+// CANCEL EMERGENCY (By Requester)
+// ======================================
+export async function cancelEmergency(req, res) {
+  try {
+    const { id } = req.params;
+    const emergencyToCancel = await emergency.findById(id);
+
+    if (!emergencyToCancel) return res.status(404).json({ success: false, message: "Emergency not found" });
+    if (emergencyToCancel.createdBy.toString() !== req.user.id.toString()) return res.status(403).json({ success: false, message: "Only creator can cancel" });
+    if (["RESOLVED", "CLOSED", "CANCELED"].includes(emergencyToCancel.status)) return res.status(400).json({ success: false, message: "Already closed" });
+
+    emergencyToCancel.status = "CANCELED";
+    emergencyToCancel.resolvedAt = new Date();
+    await emergencyToCancel.save();
+
+    const io = req.app.get("io");
+    if (io) {
+      // 🟢 FIX 2: Convert helper ID to string so the socket hits them!
+      if (emergencyToCancel.helper) {
+        const helperStr = emergencyToCancel.helper.toString();
+        io.to(`user:${helperStr}`).emit("EMERGENCY_STATUS_UPDATED", { emergencyId: emergencyToCancel._id, status: "CANCELED", message: "Requester cancelled." });
+      }
+      io.emit("EMERGENCY_CANCELLED", { emergencyId: emergencyToCancel._id });
+    }
+    return res.status(200).json({ success: true, message: "Emergency cancelled successfully" });
+  } catch (error) {
+    console.error("Cancel emergency error:", error);
+    return res.status(500).json({ success: false, message: "Failed to cancel emergency" });
+  }
+}
+
+// ==========================================
+// DROP EMERGENCY (By Helper)
+// ==========================================
+// ==========================================
+// DROP EMERGENCY (By Helper)
+// ==========================================
 export async function dropEmergency(req, res) {
   try {
     const { id } = req.params;
-    const userId = req.user.id; // The ID of the helper trying to drop it
-
-    // 1. Find the active emergency
+    const userId = req.user.id;
     const emergencyToDrop = await emergency.findById(id);
 
-    // 2. Validate it exists and the user is actually the assigned helper
     if (!emergencyToDrop) {
       return res.status(404).json({ success: false, message: "Emergency not found" });
     }
     if (!emergencyToDrop.helper || emergencyToDrop.helper.toString() !== userId.toString()) {
-      return res.status(403).json({ success: false, message: "Only the assigned helper can drop this mission." });
+      return res.status(403).json({ success: false, message: "Only assigned helper can drop." });
     }
     if (['RESOLVED', 'CLOSED', 'CANCELED'].includes(emergencyToDrop.status)) {
       return res.status(400).json({ success: false, message: "Cannot drop a closed emergency." });
     }
 
-    // 3. Revert the database state back to searching
-    emergencyToDrop.helper = null; // Remove the helper
-    emergencyToDrop.status = 'SEARCHING'; // Reset status
+    // 🟢 THE FIX: Completely kill the emergency instead of putting it back to SEARCHING
+    emergencyToDrop.status = 'CANCELED';
+    emergencyToDrop.resolvedAt = new Date();
     await emergencyToDrop.save();
 
     const io = req.app.get("io");
     if (io) {
-      // 4. Notify the Creator so their screen goes back to "Searching"
-      io.to(`user:${emergencyToDrop.createdBy}`).emit("EMERGENCY_STATUS_UPDATED", {
-        emergencyId: emergencyToDrop._id,
-        status: "SEARCHING",
-        message: "The responder had to cancel. Searching for a new hero...",
-        helperDropped: true // Flag to tell frontend to clear helper data
+      const creatorStr = emergencyToDrop.createdBy.toString();
+      
+      // 1. Tell the Requester it was cancelled so they get redirected home
+      io.to(`user:${creatorStr}`).emit("EMERGENCY_STATUS_UPDATED", {
+        emergencyId: emergencyToDrop._id, 
+        status: "CANCELED", 
+        message: "Responder had to cancel. Please create a new request." 
       });
 
-      // 5. RE-BROADCAST TO RADAR! Find all nearby users again
-      // Coordinates array in MongoDB is [longitude, latitude]
-      const nearbyUsers = await getNearbyUsers({
-        lat: emergencyToDrop.location.coordinates[1],
-        lng: emergencyToDrop.location.coordinates[0],
-        radiusInMeters: 5000, 
-      });
-
-      // 6. Loop through nearby users and send them the emergency again
-      nearbyUsers.forEach((nearbyUserId) => {
-        // Do NOT notify the original creator, and do NOT notify the helper who just dropped it!
-        if (String(nearbyUserId) === String(emergencyToDrop.createdBy) || String(nearbyUserId) === String(userId)) {
-          return; 
-        }
-
-        // Emit to everyone else's radar
-        io.to(`user:${nearbyUserId}`).emit("NEW_EMERGENCY", {
-          emergencyId: emergencyToDrop._id,
-          type: emergencyToDrop.type,
-          description: emergencyToDrop.description,
-          location: emergencyToDrop.location,
-          address: emergencyToDrop.address,
-          priority: emergencyToDrop.priority,
-          status: emergencyToDrop.status,
-        });
-      });
+      // 2. Remove it from everyone's Radar globally
+      io.emit("EMERGENCY_CANCELLED", { emergencyId: emergencyToDrop._id });
     }
-
-    // 7. Send success back to the helper who dropped it
-    return res.status(200).json({ success: true, message: "Mission dropped successfully." });
+    
+    return res.status(200).json({ success: true, message: "Mission dropped and emergency cancelled." });
   } catch (error) {
     console.error("Drop mission error:", error);
     return res.status(500).json({ success: false, message: "Failed to drop mission." });

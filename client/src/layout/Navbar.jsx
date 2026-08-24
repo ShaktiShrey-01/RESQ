@@ -5,10 +5,9 @@ import { toggleTheme } from '../store/themeSlice';
 import { Sun, Moon, Home, FileWarning, User, Siren } from 'lucide-react';
 import LogoutBtn from '../components/Logoutbtn'; // Adjust path if needed
 import { cn } from '../lib/utils';
-import resqLogo from '../assets/resq.png'; // Adjust relative path based on where your component file is
+import resqLogo from '/resq.png'; // Adjust relative path based on where your component file is
 const NAV_LINKS = [
   { to: '/', label: 'Home', icon: Home, end: true },
-  { to: '/report', label: 'Report', icon: FileWarning },
   { to: '/profile', label: 'Profile', icon: User },
 ];
 

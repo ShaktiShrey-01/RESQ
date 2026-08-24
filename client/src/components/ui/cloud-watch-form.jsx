@@ -107,12 +107,17 @@ export default function CloudWatchForm({
     ];
   } else {
     // Normal Login/Signup
+    // 🟢 UPDATED: Added the image file input for Signup
     fields = [
-      ...(isSignup ? [{ name: "name", label: "Full Name", placeholder: "Enter your name", type: "text", validation: { required: "Name is required", minLength: { value: 2, message: "Must be at least 2 chars" } } }] : []),
+      ...(isSignup ? [
+        { name: "name", label: "Full Name", placeholder: "Enter your name", type: "text", validation: { required: "Name is required", minLength: { value: 2, message: "Must be at least 2 chars" } } },
+        { name: "image", label: "Profile Picture (Optional)", type: "file", accept: "image/*" } // <-- ADDED
+      ] : []),
       { name: "email", label: "Email", placeholder: "you@example.com", type: "email", validation: { required: "Email is required", pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: "Invalid email" } } },
       { name: "password", label: "Password", placeholder: "Enter your password", type: "password", validation: { required: "Password is required", minLength: { value: 6, message: "Must be at least 6 chars" } } },
     ];
   }
+  
 
   const isEyesCovered = (passwordFocused && !showPassword) || blink;
 

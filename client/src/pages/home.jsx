@@ -44,14 +44,26 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!user) return;
+   if (!user) return;
 
     socketRef.current = io("http://localhost:8000", { withCredentials: true });
     const socket = socketRef.current;
     const userId = user.id || user._id;
 
+    // 🟢 ANTI-AMNESIA: Force it to re-join the room if the connection ever flickers
+    socket.on("connect", () => {
+      socket.emit("joinUserRoom", userId);
+    });
+    // Also emit right now on first load
     socket.emit("joinUserRoom", userId);
-    socket.emit("joinUserRoom", `user:${userId}`);
+
+    // 🟢 GLOBAL FALLBACK: If the private room misses, this catches it!
+    socket.on("EMERGENCY_ACCEPTED_GLOBAL", (data) => {
+      if (data.creatorId === userId) {
+        toast.success("A responder is on the way!");
+        navigate(`/tracking/${data.emergencyId}`);
+      }
+    });
 
     // 🟢 FRONTEND GATEKEEPER
     socket.on("NEW_EMERGENCY", (data) => {

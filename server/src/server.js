@@ -126,6 +126,38 @@ io.on("connection", (socket) => {
       console.error("LOCATION_UPDATE error:", error);
     }
   });
+  // ====================================================
+  // REAL-TIME CHAT RELAY
+  // ====================================================
+  socket.on("SEND_MESSAGE", async (data) => {
+    try {
+      const { emergencyId, senderId, text } = data;
+      if (!emergencyId || !senderId || !text) return;
+
+      const messageObj = { senderId, text, timestamp: new Date() };
+
+      // 1. Save to Database so history isn't lost on refresh
+      const emergencyData = await emergency.findByIdAndUpdate(
+        emergencyId,
+        { $push: { chat: messageObj } },
+        { new: true }
+      );
+
+      if (!emergencyData) return;
+
+      // 2. Relay the message to BOTH the Requester and the Helper instantly
+      const requesterId = emergencyData.createdBy.toString();
+      io.to(`user:${requesterId}`).emit("RECEIVE_MESSAGE", { emergencyId, message: messageObj });
+
+      if (emergencyData.helper) {
+        const helperId = emergencyData.helper.toString();
+        io.to(`user:${helperId}`).emit("RECEIVE_MESSAGE", { emergencyId, message: messageObj });
+      }
+
+    } catch (error) {
+      console.error("SEND_MESSAGE error:", error);
+    }
+  });
 
   // ====================================================
   // DISCONNECT

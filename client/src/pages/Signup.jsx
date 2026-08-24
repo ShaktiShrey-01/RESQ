@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useDispatch } from 'react-redux'; // 👈 IMPORT DISPATCH
 import { setCredentials } from '../store/authSlice'; // 👈 IMPORT ACTION
-import resqLogo from '../assets/resq.png'; // Adjust relative path based on where your component file is
+import resqLogo from '/resq.png'; // Adjust relative path based on where your component file is
 export default function Signup() {
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1); 
@@ -33,16 +33,22 @@ export default function Signup() {
   const handleVerifyOtp = async (otpFormData) => {
     setLoading(true);
     try {
-      const payload = {
-        name: signupData.name,
-        email: signupData.email,
-        password: signupData.password,
-        otp: otpFormData.otp 
-      };
-
-      const response = await api.post('/users/signup', payload);
+      // 🟢 UPDATED: Use FormData instead of JSON to support file uploads
+      const formData = new FormData();
+      formData.append('name', signupData.name);
+      formData.append('email', signupData.email);
+      formData.append('password', signupData.password);
+      formData.append('otp', otpFormData.otp);
       
-      // 🟢 CHANGED: Removed localStorage, now strictly using Redux!
+      // Check if a file was selected. React Hook Form returns a FileList array.
+      if (signupData.image && signupData.image.length > 0) {
+        formData.append('image', signupData.image[0]);
+      }
+
+      const response = await api.post('/users/signup', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
       dispatch(setCredentials({
         accessToken: response.data.accessToken, 
         user: response.data.user

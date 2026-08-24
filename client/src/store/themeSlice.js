@@ -1,7 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit';
 
 // 1. Check storage BEFORE setting the initial state
-const savedTheme = localStorage.getItem('theme') || 'light';
+const savedTheme = localStorage.getItem('theme') || 'dark';
 
 const initialState = {
   theme: savedTheme, 

@@ -12,8 +12,8 @@ async function connectdb(){
         console.log("MongoDB connected");
         
         // 🟢 TEMPORARY WIPE COMMAND
-        const result = await emergency.deleteMany({ status: "SEARCHING" });
-        console.log(`🧹 Wiped ${result.deletedCount} old searching emergencies!`);
+       // const result = await emergency.deleteMany({ status: "SEARCHING" });
+       // console.log(`🧹 Wiped ${result.deletedCount} old searching emergencies!`);
     }
     catch(err){ 
         // 🟢 CHANGED to err.message to show real errors!
