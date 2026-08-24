@@ -28,7 +28,7 @@ export default function LiveTracking() {
   const watchIdRef = useRef(null);
   const chatEndRef = useRef(null);
   const processedMessages = useRef(new Set()); 
-  const lastOsrmFetch = useRef(0); // Prevents API bans
+  const lastOsrmFetch = useRef(0); 
 
   const [emergency, setEmergency] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -117,7 +117,7 @@ export default function LiveTracking() {
 
       navigator.geolocation.getCurrentPosition(
         (pos) => broadcastLocation(pos.coords.latitude, pos.coords.longitude),
-        (err) => console.log("Initial quick-fetch failed, waiting for watcher..."),
+        (err) => console.log("Initial fetch failed"),
         { enableHighAccuracy: false, timeout: 10000, maximumAge: Infinity }
       );
 
@@ -137,7 +137,6 @@ export default function LiveTracking() {
       if (!emLng || !emLat) return;
       const directKm = calculateDistanceKm(helperCoords.lat, helperCoords.lng, emLat, emLng);
 
-      // 🟢 OSRM ANTI-BAN FIX: Only fetch routing every 10 seconds max.
       const now = Date.now();
       if (now - lastOsrmFetch.current > 10000) {
         lastOsrmFetch.current = now;
@@ -150,7 +149,6 @@ export default function LiveTracking() {
             } else setLiveDistance(directKm * 1000);
           }).catch(() => setLiveDistance(directKm * 1000));
       } else {
-        // Fallback to straight-line distance while waiting for OSRM cooldown
         if (!liveDistance) setLiveDistance(directKm * 1000);
       }
     }
@@ -175,7 +173,6 @@ export default function LiveTracking() {
 
   let narrativeTitle = ""; let narrativeSub = "";
   if (emergency.status === "SEARCHING") { narrativeTitle = "Searching..."; narrativeSub = "Alerting users"; } 
-  // 🟢 CRITICAL TEXT FIX: We must include 'ASSIGNED' here otherwise it renders blank strings!
   else if (['ASSIGNED', 'ON_THE_WAY'].includes(emergency.status)) { 
     narrativeTitle = isRequester ? "Responder En Route" : "Head to Location"; 
     narrativeSub = estimatedMins > 0 ? `${estimatedMins} mins • ${formattedDistance}` : formattedDistance; 
@@ -183,39 +180,27 @@ export default function LiveTracking() {
     narrativeTitle = "Arrived at Destination"; narrativeSub = "Location reached safely.";
   }
 
+  // 🟢 NEW LAYOUT: Scrollable Flex-Col, Transparent, Stacked for ALL devices
   return (
-    <div className="w-full h-[100dvh] relative overflow-hidden bg-neutral-900">
+    <div className="w-full min-h-[100dvh] bg-transparent flex flex-col relative overflow-y-auto overflow-x-hidden">
       
       <ChatModal isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} messages={messages} currentUserId={currentUserId} otherPerson={otherPerson} newMessage={newMessage} setNewMessage={setNewMessage} onSendMessage={(e) => { e.preventDefault(); if (newMessage.trim()) { socketRef.current.emit("SEND_MESSAGE", { emergencyId: id, senderId: currentUserId, text: newMessage.trim() }); setNewMessage(""); } }} chatEndRef={chatEndRef} />
 
-      {/* 🗺️ LAYER 1: ABSOLUTE FULL SCREEN MAP */}
-      <div className="absolute inset-0 z-0">
+      {/* 1. TOP PANEL (Transparent) */}
+      <div className="w-full z-20 max-w-4xl mx-auto">
+        <TrackingTopPanel narrativeTitle={narrativeTitle} narrativeSub={narrativeSub} onBack={() => navigate('/')} />
+      </div>
+
+      {/* 2. MAP (Fixed height so user can scroll past it) */}
+      <div className="w-full h-[50vh] min-h-[400px] z-10 max-w-4xl mx-auto rounded-none md:rounded-3xl overflow-hidden border-0 md:border border-neutral-200 dark:border-neutral-800 shadow-none md:shadow-lg">
         <TrackingMap emergencyLat={emergencyLat} emergencyLng={emergencyLng} helperCoords={helperCoords} routeLine={routeLine} status={emergency.status} />
       </div>
 
-      {/* 📱 LAYER 2: TRANSPARENT GLASS UI FLOATING OVER MAP */}
-      <div className="absolute inset-0 z-10 pointer-events-none flex flex-col md:flex-row">
-        
-        {/* Mobile Top Panel & Desktop Sidebar Wrapper */}
-        <div className="pointer-events-auto w-full md:w-[400px] md:h-full md:p-4 flex flex-col">
-          <div className="bg-white/70 dark:bg-black/70 backdrop-blur-xl md:rounded-3xl md:h-full md:shadow-2xl flex flex-col overflow-hidden border-b md:border border-white/20 dark:border-white/10">
-            <TrackingTopPanel narrativeTitle={narrativeTitle} narrativeSub={narrativeSub} onBack={() => navigate('/')} />
-            <div className="flex-1 hidden md:block"></div>
-            {/* Desktop Bottom Panel embedded in sidebar */}
-            <div className="hidden md:block">
-              <TrackingBottomPanel isRequester={isRequester} isHelper={isHelper} otherPerson={otherPerson} emergency={emergency} isWithin100m={isWithin100m} isResolving={isResolving} isDropping={isDropping} isCanceling={isCanceling} displayAddress={emergency.location?.address} onResolve={() => { setIsResolving(true); api.patch(`/emergencies/${id}/status`, { status: 'RESOLVED' }).then(() => navigate('/')).catch(() => { toast.error("Failed"); setIsResolving(false); }); }} onDrop={() => { if(window.confirm("Cancel response?")) { setIsDropping(true); api.post(`/emergencies/${id}/drop`).then(() => navigate('/')).catch(() => { toast.error("Failed"); setIsDropping(false); }); } }} onCancel={() => { if(window.confirm("Cancel emergency?")) { setIsCanceling(true); api.patch(`/emergencies/${id}/cancel`).then(() => navigate('/')).catch(() => { toast.error("Failed"); setIsCanceling(false); }); } }} onOpenChat={() => setIsChatOpen(true)} />
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile Floating Bottom Panel */}
-        <div className="pointer-events-auto absolute bottom-0 left-0 w-full md:hidden">
-          <div className="bg-white/70 dark:bg-black/70 backdrop-blur-xl rounded-t-3xl border-t border-white/20 dark:border-white/10 shadow-[0_-10px_40px_rgba(0,0,0,0.1)]">
-            <TrackingBottomPanel isRequester={isRequester} isHelper={isHelper} otherPerson={otherPerson} emergency={emergency} isWithin100m={isWithin100m} isResolving={isResolving} isDropping={isDropping} isCanceling={isCanceling} displayAddress={emergency.location?.address} onResolve={() => { setIsResolving(true); api.patch(`/emergencies/${id}/status`, { status: 'RESOLVED' }).then(() => navigate('/')).catch(() => { toast.error("Failed"); setIsResolving(false); }); }} onDrop={() => { if(window.confirm("Cancel response?")) { setIsDropping(true); api.post(`/emergencies/${id}/drop`).then(() => navigate('/')).catch(() => { toast.error("Failed"); setIsDropping(false); }); } }} onCancel={() => { if(window.confirm("Cancel emergency?")) { setIsCanceling(true); api.patch(`/emergencies/${id}/cancel`).then(() => navigate('/')).catch(() => { toast.error("Failed"); setIsCanceling(false); }); } }} onOpenChat={() => setIsChatOpen(true)} />
-          </div>
-        </div>
-
+      {/* 3. BOTTOM PANEL (Transparent) */}
+      <div className="w-full z-20 flex-1 pb-10 max-w-4xl mx-auto">
+        <TrackingBottomPanel isRequester={isRequester} isHelper={isHelper} otherPerson={otherPerson} emergency={emergency} isWithin100m={isWithin100m} isResolving={isResolving} isDropping={isDropping} isCanceling={isCanceling} displayAddress={emergency.location?.address} onResolve={() => { setIsResolving(true); api.patch(`/emergencies/${id}/status`, { status: 'RESOLVED' }).then(() => navigate('/')).catch(() => { toast.error("Failed"); setIsResolving(false); }); }} onDrop={() => { if(window.confirm("Cancel response?")) { setIsDropping(true); api.post(`/emergencies/${id}/drop`).then(() => navigate('/')).catch(() => { toast.error("Failed"); setIsDropping(false); }); } }} onCancel={() => { if(window.confirm("Cancel emergency?")) { setIsCanceling(true); api.patch(`/emergencies/${id}/cancel`).then(() => navigate('/')).catch(() => { toast.error("Failed"); setIsCanceling(false); }); } }} onOpenChat={() => setIsChatOpen(true)} />
       </div>
+
     </div>
   );
 }

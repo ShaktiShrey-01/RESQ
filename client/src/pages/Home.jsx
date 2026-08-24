@@ -48,7 +48,6 @@ export default function Home() {
     socketRef.current = io(import.meta.env.VITE_BACKEND_URL, { withCredentials: true });
     const socket = socketRef.current;
     
-    // 🟢 CRITICAL: Force strict string to prevent mismatch bugs
     const userId = String(user.id || user._id);
 
     const fetchNearby = (lat, lng) => {
@@ -57,7 +56,6 @@ export default function Home() {
          .catch(console.error);
     };
 
-    // 🟢 WAKE UP FIX: If phone was asleep and reconnects, fetch missing data instantly
     socket.on("connect", () => {
       socket.emit("joinUserRoom", userId);
       if (currentLocRef.current) {
@@ -83,20 +81,17 @@ export default function Home() {
         const distance = calculateDistanceKm(currentLocRef.current.lat, currentLocRef.current.lng, emLat, emLng);
         
         if (!isNaN(distance) && distance <= 5.0) {
-          setNearbyEmergencies((prev) => {
-            // 🟢 DUPLICATE FIX: Prevent double UI cards if fetch and socket overlap
-            if (prev.some(em => (String(em._id) === String(data._id) || String(em.emergencyId) === String(data._id)))) return prev;
-            
-            toast.error(`New ${data.priority} Emergency nearby!`);
-            sendSystemNotification(
-              "🚨 Urgent: Emergency Nearby!", 
-              `${data.type} emergency reported ${distance.toFixed(1)} km away. Tap to view.`
-            );
-            return [data, ...prev];
-          });
+          toast.error(`New ${data.priority} Emergency nearby!`);
+          sendSystemNotification(
+            "🚨 Urgent: Emergency Nearby!", 
+            `${data.type} emergency reported ${distance.toFixed(1)} km away. Tap to view.`
+          );
+          
+          // 🟢 CRASH FIX: Do NOT push raw socket data into state. 
+          // Fetch from API instead so it has the perfectly populated database structure.
+          fetchNearby(currentLocRef.current.lat, currentLocRef.current.lng);
         }
       } else {
-        // 🟢 MOBILE FALLBACK: The socket beat the GPS. Wait 3 seconds and re-fetch.
         setTimeout(() => {
           if (currentLocRef.current) fetchNearby(currentLocRef.current.lat, currentLocRef.current.lng);
         }, 3000);
@@ -120,8 +115,6 @@ export default function Home() {
       setNearbyEmergencies((prev) => prev.filter(e => String(e.emergencyId || e._id) !== String(data.emergencyId)));
     });
 
-    // 🟢 INSTANT MOBILE GPS BLASTER
-    // Forces the phone to grab location immediately on load instead of waiting for movement
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const lat = pos.coords.latitude;
@@ -133,11 +126,10 @@ export default function Home() {
           fetchNearby(lat, lng);
         }
       },
-      (err) => console.log("Initial quick-fetch waiting for continuous watcher..."),
+      (err) => console.log("Waiting for continuous watcher..."),
       { enableHighAccuracy: false, timeout: 5000, maximumAge: Infinity }
     );
 
-    // Continuous Watcher (High Accuracy)
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
         const lat = position.coords.latitude;
@@ -179,14 +171,11 @@ export default function Home() {
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      
-      {/* 🟢 TOP GRID (Creator & Radar) */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-20">
         <EmergencyCreator />
         <EmergencyRadar emergencies={nearbyEmergencies} isTracking={isTracking} onAccept={handleAccept} onDecline={handleDecline} />
       </div>
 
-      {/* 🟢 HOW IT WORKS SECTION */}
       <div className="w-full flex flex-col items-center text-center mb-10">
         <h2 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white mb-4">
           RESQ: Help is closer than you think.
@@ -196,7 +185,6 @@ export default function Home() {
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
-          {/* Card 1 */}
           <div className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border-[3px] border-black/5 dark:border-white/10 p-8 rounded-3xl flex flex-col items-center text-center shadow-lg transition-transform hover:-translate-y-2">
             <div className="h-16 w-16 bg-red-100 dark:bg-red-900/30 rounded-2xl flex items-center justify-center mb-6">
               <ShieldAlert className="h-8 w-8 text-red-600 dark:text-red-400" />
@@ -206,8 +194,6 @@ export default function Home() {
               Report an emergency with your exact GPS location. The system immediately processes your request.
             </p>
           </div>
-
-          {/* Card 2 */}
           <div className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border-[3px] border-black/5 dark:border-white/10 p-8 rounded-3xl flex flex-col items-center text-center shadow-lg transition-transform hover:-translate-y-2">
             <div className="h-16 w-16 bg-blue-100 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center mb-6">
               <Radio className="h-8 w-8 text-blue-600 dark:text-blue-400" />
@@ -217,8 +203,6 @@ export default function Home() {
               Your alert is broadcasted to all active RESQ users within a 5km radius via real-time WebSockets.
             </p>
           </div>
-
-          {/* Card 3 */}
           <div className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border-[3px] border-black/5 dark:border-white/10 p-8 rounded-3xl flex flex-col items-center text-center shadow-lg transition-transform hover:-translate-y-2">
             <div className="h-16 w-16 bg-emerald-100 dark:bg-emerald-900/30 rounded-2xl flex items-center justify-center mb-6">
               <HeartHandshake className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
