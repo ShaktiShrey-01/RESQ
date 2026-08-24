@@ -82,35 +82,47 @@ export default function Home() {
       }
     });
 
+    // 🟢 PERMANENT FIX: Zero lag, zero races, direct state injection
     socket.on("NEW_EMERGENCY", (data) => {
       if (String(data.creatorId) === userId) return;
-
-      if (currentLocRef.current) {
-        const emLng = data.location.coordinates[0];
-        const emLat = data.location.coordinates[1];
-        const distance = calculateDistanceKm(currentLocRef.current.lat, currentLocRef.current.lng, emLat, emLng);
+      if (!currentLocRef.current) return; // no GPS yet, nothing to compare against
+      
+      const emLng = data.location.coordinates[0];
+      const emLat = data.location.coordinates[1];
+      const distance = calculateDistanceKm(currentLocRef.current.lat, currentLocRef.current.lng, emLat, emLng);
+      
+      if (isNaN(distance) || distance > 5.0) return;
+      
+      toast.error(`New ${data.priority} Emergency nearby!`, { id: `new-em-${data.emergencyId}` });
+      sendSystemNotification(
+        "🚨 Urgent: Emergency Nearby!",
+        `${data.type} emergency reported ${distance.toFixed(1)} km away. Tap to view.`
+      );
+      
+      setNearbyEmergencies((prev) => {
+        const id = String(data.emergencyId);
+        const alreadyExists = prev.some((e) => String(e.emergencyId || e._id) === id);
+        if (alreadyExists) return prev;
         
-        if (!isNaN(distance) && distance <= 5.0) {
-          // 1. Show the pop-up instantly
-          toast.error(`New ${data.priority} Emergency nearby!`, { id: `new-em-${data.emergencyId}` });
-          sendSystemNotification(
-            "🚨 Urgent: Emergency Nearby!", 
-            `${data.type} emergency reported ${distance.toFixed(1)} km away. Tap to view.`
-          );
-          
-          // 🟢 CRASH FIX: Do NOT manually inject fake data into React state.
-          // Wait exactly 500ms for MongoDB to fully index the new emergency, then fetch the perfect data.
-          setTimeout(() => {
-            if (currentLocRef.current) {
-              fetchNearby(currentLocRef.current.lat, currentLocRef.current.lng);
-            }
-          }, 500);
-        }
-      } else {
-        setTimeout(() => {
-          if (currentLocRef.current) fetchNearby(currentLocRef.current.lat, currentLocRef.current.lng);
-        }, 3000);
-      }
+        // Structure the socket payload to perfectly mimic a Mongoose populated object
+        // This ensures EmergencyRadar never crashes looking for 'createdBy'
+        const instantEmergencyObj = {
+          _id: data.emergencyId,
+          type: data.type,
+          description: data.description,
+          location: data.location,
+          address: data.address,
+          priority: data.priority,
+          status: data.status,
+          createdAt: new Date().toISOString(),
+          createdBy: {
+            _id: data.creatorId,
+            name: data.creatorName
+          }
+        };
+        
+        return [instantEmergencyObj, ...prev];
+      });
     });
 
     socket.on("EMERGENCY_CANCELLED", (data) => {
