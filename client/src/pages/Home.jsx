@@ -47,16 +47,17 @@ export default function Home() {
 
     socketRef.current = io(import.meta.env.VITE_BACKEND_URL, { withCredentials: true });
     const socket = socketRef.current;
-    const userId = user.id || user._id;
+    
+    // 🟢 CRITICAL: Force strict string to prevent mismatch bugs
+    const userId = String(user.id || user._id);
 
-    // 🟢 REUSABLE FETCH FUNCTION: Used for initial load, wake-ups, and GPS lag
     const fetchNearby = (lat, lng) => {
       api.get(`/emergencies/nearby?lat=${lat}&lng=${lng}`)
          .then(res => setNearbyEmergencies(res.data.data))
          .catch(console.error);
     };
 
-    // 🟢 WAKE UP FIX: If the phone was asleep and reconnects, fetch missing data
+    // 🟢 WAKE UP FIX: If phone was asleep and reconnects, fetch missing data instantly
     socket.on("connect", () => {
       socket.emit("joinUserRoom", userId);
       if (currentLocRef.current) {
@@ -67,14 +68,14 @@ export default function Home() {
     socket.emit("joinUserRoom", userId);
 
     socket.on("EMERGENCY_ACCEPTED_GLOBAL", (data) => {
-      if (data.creatorId === userId) {
+      if (String(data.creatorId) === userId) {
         toast.success("A responder is on the way!");
         navigate(`/tracking/${data.emergencyId}`);
       }
     });
 
     socket.on("NEW_EMERGENCY", (data) => {
-      if (data.creatorId === userId) return;
+      if (String(data.creatorId) === userId) return;
 
       if (currentLocRef.current) {
         const emLng = data.location.coordinates[0];
@@ -83,8 +84,8 @@ export default function Home() {
         
         if (!isNaN(distance) && distance <= 5.0) {
           setNearbyEmergencies((prev) => {
-            // 🟢 DUPLICATE FIX: Prevent double UI cards
-            if (prev.some(em => (em._id === data._id || em.emergencyId === data._id))) return prev;
+            // 🟢 DUPLICATE FIX: Prevent double UI cards if fetch and socket overlap
+            if (prev.some(em => (String(em._id) === String(data._id) || String(em.emergencyId) === String(data._id)))) return prev;
             
             toast.error(`New ${data.priority} Emergency nearby!`);
             sendSystemNotification(
@@ -95,11 +96,9 @@ export default function Home() {
           });
         }
       } else {
-        // 🟢 GPS LAG FIX: If the socket beats the mobile GPS, wait 3 seconds and fetch
+        // 🟢 MOBILE FALLBACK: The socket beat the GPS. Wait 3 seconds and re-fetch.
         setTimeout(() => {
-          if (currentLocRef.current) {
-            fetchNearby(currentLocRef.current.lat, currentLocRef.current.lng);
-          }
+          if (currentLocRef.current) fetchNearby(currentLocRef.current.lat, currentLocRef.current.lng);
         }, 3000);
       }
     });
@@ -118,9 +117,27 @@ export default function Home() {
     });
 
     socket.on("EMERGENCY_CANCELLED", (data) => {
-      setNearbyEmergencies((prev) => prev.filter(e => (e.emergencyId || e._id) !== data.emergencyId));
+      setNearbyEmergencies((prev) => prev.filter(e => String(e.emergencyId || e._id) !== String(data.emergencyId)));
     });
 
+    // 🟢 INSTANT MOBILE GPS BLASTER
+    // Forces the phone to grab location immediately on load instead of waiting for movement
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        currentLocRef.current = { lat, lng };
+        setIsTracking(true);
+        if (!fetchedInitialRef.current) {
+          fetchedInitialRef.current = true;
+          fetchNearby(lat, lng);
+        }
+      },
+      (err) => console.log("Initial quick-fetch waiting for continuous watcher..."),
+      { enableHighAccuracy: false, timeout: 5000, maximumAge: Infinity }
+    );
+
+    // Continuous Watcher (High Accuracy)
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
         const lat = position.coords.latitude;
@@ -133,12 +150,10 @@ export default function Home() {
 
         if (!fetchedInitialRef.current) {
           fetchedInitialRef.current = true;
-          fetchNearby(lat, lng); // Uses the reusable function
+          fetchNearby(lat, lng); 
         }
       },
-      (error) => {
-        setIsTracking(false);
-      },
+      (error) => setIsTracking(false),
       { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
     );
 
@@ -151,7 +166,7 @@ export default function Home() {
   const handleAccept = async (emergencyId) => {
     try {
       await api.post(`/emergencies/${emergencyId}/accept`);
-      setNearbyEmergencies((prev) => prev.filter(e => (e.emergencyId || e._id) !== emergencyId));
+      setNearbyEmergencies((prev) => prev.filter(e => String(e.emergencyId || e._id) !== String(emergencyId)));
       navigate(`/tracking/${emergencyId}`);
     } catch (error) {
       console.error("Accept failed", error);
@@ -159,7 +174,7 @@ export default function Home() {
   };
 
   const handleDecline = (emergencyId) => {
-    setNearbyEmergencies((prev) => prev.filter(e => (e.emergencyId || e._id) !== emergencyId));
+    setNearbyEmergencies((prev) => prev.filter(e => String(e.emergencyId || e._id) !== String(emergencyId)));
   };
 
   return (
@@ -173,13 +188,14 @@ export default function Home() {
 
       {/* 🟢 HOW IT WORKS SECTION */}
       <div className="w-full flex flex-col items-center text-center mb-10">
-        <h2 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white mb-4">How RESQ Works</h2>
+        <h2 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white mb-4">
+          RESQ: Help is closer than you think.
+        </h2>
         <p className="text-slate-600 dark:text-slate-400 font-medium mb-12 max-w-xl">
           A seamless emergency response system designed to connect those in need with nearby helpers instantly.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
-          
           {/* Card 1 */}
           <div className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border-[3px] border-black/5 dark:border-white/10 p-8 rounded-3xl flex flex-col items-center text-center shadow-lg transition-transform hover:-translate-y-2">
             <div className="h-16 w-16 bg-red-100 dark:bg-red-900/30 rounded-2xl flex items-center justify-center mb-6">
@@ -212,10 +228,8 @@ export default function Home() {
               A nearby responder accepts the mission. You both get connected on a live tracking map instantly.
             </p>
           </div>
-
         </div>
       </div>
-
     </div>
   );
 }

@@ -14,7 +14,8 @@ export default function TrackingBottomPanel({
   const personAvatar = otherPerson?.avatar || defaultAvatar;
 
   return (
-    <div className="w-full bg-white dark:bg-neutral-900 border-t border-neutral-200 dark:border-neutral-800 p-5 z-20 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
+// Remove bg-white dark:bg-neutral-900 and borders, keep it transparent
+<div className="w-full p-5 z-20">
       {/* Swipe handle for mobile look */}
       <div className="w-10 h-1 bg-neutral-200 dark:bg-neutral-700 rounded-full mx-auto mb-5 md:hidden"></div>
       

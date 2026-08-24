@@ -7,7 +7,8 @@ export default function TrackingTopPanel({
   onBack
 }) {
   return (
-    <div className="w-full bg-white dark:bg-neutral-900 md:border-b border-neutral-200 dark:border-neutral-800 flex flex-col pt-4 pb-4 px-4 relative shadow-sm z-20">
+   // Remove bg-white dark:bg-neutral-900, keep it transparent
+<div className="w-full flex flex-col pt-4 pb-4 px-4 relative z-20">
       <div className="flex items-center justify-center relative w-full">
         <button
           onClick={onBack}

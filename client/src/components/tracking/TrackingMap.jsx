@@ -46,7 +46,7 @@ export default function TrackingMap({ emergencyLat, emergencyLng, helperCoords, 
 
   return (
     // 🟢 CRITICAL MOBILE FIX: Force min-height and strict styling so grid doesn't crush the map
-    <div className="w-full h-full min-h-[45vh] md:min-h-full relative z-0 flex flex-col flex-1">
+    <div className="w-full h-full  md:min-h-full relative z-0 flex flex-col flex-1">
       <MapContainer
         center={[emergencyLat, emergencyLng]}
         zoom={15}
