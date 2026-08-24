@@ -20,7 +20,8 @@ const LiveTracking = lazy(() => import('./pages/LiveTracking'));
 const Login = lazy(() => import('./pages/Login'));
 const Signup = lazy(() => import('./pages/Signup'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
-const Home = lazy(() => import('./pages/Home'));
+// 🟢 Match the exact casing of the file on your hard drive
+const Home = lazy(() => import("./pages/Home"));
 const Profile = lazy(() => import('./pages/Profile'));
 
 function App() {

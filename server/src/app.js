@@ -8,7 +8,7 @@ const app = express();
 
 // 1. CORS MUST BE AT THE VERY TOP (Before any routes or parsers)
 app.use(cors({
-  origin: "http://localhost:5173", // Exact frontend URL
+  origin: ["http://localhost:5173", "https://resq-01.netlify.app"], // Exact frontend URL
   credentials: true,               // Required for cookies/tokens
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"]
