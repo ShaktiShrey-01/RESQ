@@ -44,7 +44,8 @@ export default function LiveTracking() {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
 
-  const currentUserId = user?.id || user?._id;
+  // 🟢 CRITICAL FIX: Force the ID to be a String instantly so all comparisons work
+  const currentUserId = String(user?.id || user?._id);
 
   useEffect(() => {
     if (isChatOpen && chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -80,26 +81,37 @@ export default function LiveTracking() {
     socketRef.current = io(import.meta.env.VITE_BACKEND_URL, { withCredentials: true });
     const socket = socketRef.current;
     
-    if (currentUserId) socket.emit("joinUserRoom", `user:${currentUserId}`);
+    // 🟢 CRITICAL FIX: Remove 'user:' so it matches the room joined in Home.jsx exactly
+    if (currentUserId) socket.emit("joinUserRoom", currentUserId);
     socket.emit("joinEmergencyRoom", id);
 
     socket.on("HELPER_LOCATION_UPDATED", (data) => {
-      if (data.emergencyId === id) setHelperCoords({ lat: Number(data.lat), lng: Number(data.lng) });
+      if (String(data.emergencyId) === String(id)) {
+        setHelperCoords({ lat: Number(data.lat), lng: Number(data.lng) });
+      }
     });
 
     socket.on("RECEIVE_MESSAGE", (data) => {
-      if (data.emergencyId === id) {
+      if (String(data.emergencyId) === String(id)) {
         if (processedMessages.current.has(data.message.timestamp)) return;
         processedMessages.current.add(data.message.timestamp);
         setMessages((prev) => [...prev, data.message]);
-        if (data.message.senderId !== currentUserId && !isChatOpen) {
+        if (String(data.message.senderId) !== currentUserId && !isChatOpen) {
           toast.success('New Message', { icon: '💬', duration: 2500 });
         }
       }
     });
 
+    // 🟢 CRITICAL FIX: Global listener to force redirect when dropped/cancelled by anyone
+    socket.on("EMERGENCY_CANCELLED", (data) => {
+      if (String(data.emergencyId) === String(id)) {
+        toast.error("This emergency has been closed.");
+        navigate('/');
+      }
+    });
+
     socket.on("EMERGENCY_STATUS_UPDATED", (data) => {
-      if (data.emergencyId === id) {
+      if (String(data.emergencyId) === String(id)) {
         if (data.status === 'SEARCHING' || data.status === 'CANCELED' || data.status === 'RESOLVED') {
           navigate('/'); return;
         }
@@ -114,14 +126,14 @@ export default function LiveTracking() {
   }, [id, currentUserId, navigate, isChatOpen]);
 
   // GPS tracking for helper
- // GPS tracking for helper
   useEffect(() => {
     if (!emergency || !currentUserId) return;
-    const isHelper = emergency.helper?._id === currentUserId || emergency.helper === currentUserId;
+    
+    // 🟢 CRITICAL FIX: Force string conversion to ensure PC knows it is the helper
+    const isHelper = Boolean(emergency.helper && (String(emergency.helper._id) === currentUserId || String(emergency.helper) === currentUserId));
     
     if (isHelper && ['ASSIGNED', 'ON_THE_WAY', 'ARRIVED'].includes(emergency.status)) {
       
-      // Helper function to send location to socket instantly
       const broadcastLocation = (lat, lng) => {
         setHelperCoords({ lat, lng }); 
         if (socketRef.current) {
@@ -129,15 +141,14 @@ export default function LiveTracking() {
         }
       };
 
-      // 🟢 FIX 1: THE INSTANT BLASTER
-      // PCs often stall on watchPosition. This forces an immediate location send to the requester.
+      // 🟢 CRITICAL FIX: PC Geolocation Fallback
+      // PC's fail high-accuracy checks. We set enableHighAccuracy to FALSE for the initial blast to guarantee a pin drop.
       navigator.geolocation.getCurrentPosition(
         (pos) => broadcastLocation(pos.coords.latitude, pos.coords.longitude),
-        (err) => console.log("Initial quick-fetch waiting for watcher..."),
-        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+        (err) => console.log("Initial quick-fetch failed, waiting for watcher..."),
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: Infinity }
       );
 
-      // 🟢 CONTINUOUS WATCHER
       watchIdRef.current = navigator.geolocation.watchPosition(
         (position) => broadcastLocation(position.coords.latitude, position.coords.longitude),
         (error) => console.error("Tracking error:", error),
@@ -197,19 +208,18 @@ export default function LiveTracking() {
 
   if (loading || !emergency) return <div className="min-h-screen flex items-center justify-center"><Loader fullScreen /></div>;
 
-  // CRASH FIX: Ensure object structure before accessing properties
   const emergencyLat = emergency.location?.coordinates?.[1];
   const emergencyLng = emergency.location?.coordinates?.[0];
-  const isRequester = emergency.createdBy?._id === currentUserId || emergency.createdBy === currentUserId;
-  const isHelper = emergency.helper?._id === currentUserId || emergency.helper === currentUserId;
   
-  // Safely extract the other person object
+  // 🟢 CRITICAL FIX: Safe string comparison for UI Roles
+  const isRequester = Boolean(emergency.createdBy && (String(emergency.createdBy._id) === currentUserId || String(emergency.createdBy) === currentUserId));
+  const isHelper = Boolean(emergency.helper && (String(emergency.helper._id) === currentUserId || String(emergency.helper) === currentUserId));
+  
   let otherPerson = isRequester ? emergency.helper : emergency.createdBy;
-  if (typeof otherPerson === 'string') otherPerson = { _id: otherPerson }; // Prevents .name crash
+  if (typeof otherPerson === 'string') otherPerson = { _id: otherPerson };
 
   const estimatedMins = liveDistance ? Math.ceil(liveDistance / 333) : 0;
   
-  // CRASH FIX: Awaiting location logic
   let formattedDistance = "Awaiting Location...";
   if (liveDistance) {
     formattedDistance = liveDistance < 1000 ? `${Math.round(liveDistance)} m` : `${(liveDistance / 1000).toFixed(1)} km`;
