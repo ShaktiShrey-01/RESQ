@@ -94,7 +94,7 @@ export async function createuser(req, res) {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
    // 🟢 UPDATED: Handle optional image buffer from Multer memory storage
-   const defaultAvatar = `${req.protocol}://${req.get('host')}/default.jpg`;
+   const defaultAvatar = `https://ik.imagekit.io/qtlcatrxjs/default-avatar.png`; // Default avatar URL
     let avatarUrl = defaultAvatar; // Default avatar if no image is provided
     if (req.file) {
       const base64Image = req.file.buffer.toString('base64');
