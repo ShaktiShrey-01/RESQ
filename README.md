@@ -1,8 +1,7 @@
 # 🚨 RESQ - Real-Time Emergency Response System
 
 > **"Help is closer than you think."**
-
-![RESQ Banner](https://via.placeholder.com/1200x300/1e293b/ffffff?text=RESQ+-+Real-Time+Emergency+Response)
+<img width="1536" height="1024" alt="resq-2" src="https://github.com/user-attachments/assets/e4b47f1e-bb88-4dc0-a467-e8307a31ea90" />!
 
 [![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://reactjs.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
@@ -57,21 +56,9 @@ RESQ is built on the **MERN** stack, supercharged with modern DevOps and caching
 
 ---
 
-## 🚀 Installation & Local Setup
-
-### Prerequisites
-
-Make sure you have the following installed on your machine:
-
-- [Node.js](https://nodejs.org/) (v18+)
-- [Git](https://git-scm.com/)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Optional, for containerized execution)
-- A MongoDB cluster or local instance
-- A Redis Cloud URL or local instance
-
-### 1. Clone the Repository
-
-```bash
+🚨 RESQ - Real-Time Emergency Response System
+🚀 Installation & Local Setup
+1. Clone the Repository
 git clone https://github.com/yourusername/RESQ.git
 cd RESQ
 
@@ -112,9 +99,10 @@ Run the following command in the root directory:
 docker-compose up --build
 
 The services will be available at:
-Backend: Port 8000
+Backend:  Port 8000
 Frontend: Port 5173
-Redis: Port 6379
+Redis:    Port 6379
+
 To stop the containers, run:
 docker-compose down
 
@@ -131,11 +119,6 @@ Database: Hosted on MongoDB Atlas
 Caching: Hosted on Redis Cloud
 👨‍💻 Author
 Developed by Shakti Shrey
-GitHub: @yourusername
-LinkedIn: Your LinkedIn Profile
-Portfolio: Your Portfolio Link
 ⭐ Support
 If you like this project, please consider giving it a ⭐ on GitHub!
 RESQ — Help is closer than you think.
-
-Save the above content as **`README.md`** (or `remade.md` if that is specifically the filename you want).
