@@ -42,6 +42,11 @@ RESQ is built on the **MERN** stack, supercharged with modern DevOps and caching
 - **Socket.io:** Powers the real-time radar, live location streaming, and instant messaging.
 - **Nodemailer:** Handles automated email delivery for OTP verification and password resets.
 
+### Deployment
+- Frotnend:Netlify
+- backend :render
+- redis:upstash
+
 ### Specialized Technologies & Why We Used Them
 
 - **Redis (In-Memory Data Store):**
